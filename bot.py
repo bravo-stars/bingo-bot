@@ -22,6 +22,13 @@ keyboard = [
     ["📖 Instruction"]
 ]
 
+rooms = [
+    ["🎮 Play Demo"],
+    ["🌟 Super Bingo Demo"],
+    ["🎁 BravoBingo Bonus"],
+    ["⬅️ Back"]
+]
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🎉 Welcome to Bingo Bot!\nChoose an option:",
@@ -33,13 +40,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
 
+    if choice == "🎮 Play":
+        await update.message.reply_text(
+            "🕹 PLAY IN:\nChoose a room to join the demo game.",
+            reply_markup=ReplyKeyboardMarkup(
+                rooms, resize_keyboard=True
+            )
+        )
+        return
+
+    if choice in rooms[0] + rooms[1] + rooms[2]:
+        await update.message.reply_text(
+            f"🎮 {choice}\n\nDemo room selected!\nGame setup is coming soon."
+        )
+        return
+
+    if choice == "⬅️ Back":
+        await start(update, context)
+        return
+
     responses = {
         "📝 Register": "📝 Registration feature is coming soon.",
-        "💰 Check your balance": "💰 Your balance: 0 ETB",
-        "💳 Deposit": "💳 Deposit feature is coming soon.",
-        "🏧 Withdrawal": "🏧 Withdrawal feature is coming soon.",
+        "💰 Check your balance": "💰 Demo balance: 0 ETB",
+        "💳 Deposit": "💳 Demo deposit is not available.",
+        "🏧 Withdrawal": "🏧 Demo withdrawal is not available.",
         "📜 Transaction History": "📜 No transactions yet.",
-        "🎮 Play": "🎮 Welcome! Bingo game is coming soon.",
         "📖 Instruction": "📖 Register first, then play Bingo."
     }
 
@@ -60,7 +85,6 @@ async def main():
 
     await app.initialize()
     await app.start()
-
     await app.updater.start_webhook(
         listen="0.0.0.0",
         port=port,
