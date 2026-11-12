@@ -9,7 +9,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-TOKEN = os.environ["9200651366:AAGOzolrB8Y09uqHGmz5t19Lmxegnd7XKHc"]
+TOKEN = os.environ["BOT_TOKEN"]
 
 keyboard = [
     ["🎮 Play", "💰 Check your balance"],
