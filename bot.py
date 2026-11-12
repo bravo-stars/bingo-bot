@@ -1,5 +1,6 @@
 
 import os
+import asyncio
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Application,
@@ -43,7 +44,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         responses.get(choice, "Please choose a menu button.")
     )
 
-def main():
+async def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -52,13 +53,24 @@ def main():
     )
 
     external_url = os.environ["RENDER_EXTERNAL_URL"]
+    port = int(os.environ.get("PORT", 10000))
 
-    app.run_webhook(
+    await app.initialize()
+    await app.start()
+
+    await app.updater.start_webhook(
         listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
+        port=port,
         url_path="telegram",
         webhook_url=f"{external_url}/telegram",
     )
 
+    try:
+        await asyncio.Event().wait()
+    finally:
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
