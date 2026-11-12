@@ -13,10 +13,13 @@ from telegram.ext import (
 TOKEN = os.environ["BOT_TOKEN"]
 
 keyboard = [
-    ["🎮 Play", "💰 Check your balance"],
-    ["💳 Deposit", "🏧 Withdrawal"],
+    ["🎮 Play"],
+    ["💰 Check your balance"],
+    ["💳 Deposit"],
+    ["🏧 Withdrawal"],
     ["📜 Transaction History"],
-    ["📖 Instruction", "📝 Register"]
+    ["📖 Instruction"],
+    ["📝 Register"]
 ]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
