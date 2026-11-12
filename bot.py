@@ -13,13 +13,13 @@ from telegram.ext import (
 TOKEN = os.environ["BOT_TOKEN"]
 
 keyboard = [
-    ["📝 Register"],
+    ["🎮 Play"],
     ["💰 Check your balance"],
     ["💳 Deposit"],
     ["🏧 Withdrawal"],
     ["📜 Transaction History"],
-    ["🎮 Play"],
-    ["📖 Instruction"]
+    ["📖 Instruction"],
+    ["👤 Register"]
 ]
 
 rooms = [
@@ -60,12 +60,12 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     responses = {
-        "📝 Register": "📝 Registration feature is coming soon.",
         "💰 Check your balance": "💰 Demo balance: 0 ETB",
         "💳 Deposit": "💳 Demo deposit is not available.",
         "🏧 Withdrawal": "🏧 Demo withdrawal is not available.",
         "📜 Transaction History": "📜 No transactions yet.",
-        "📖 Instruction": "📖 Register first, then play Bingo."
+        "📖 Instruction": "📖 Register first, then play Bingo.",
+        "👤 Register": "👤 Registration feature is coming soon."
     }
 
     await update.message.reply_text(
