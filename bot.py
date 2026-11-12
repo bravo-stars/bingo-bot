@@ -1,8 +1,15 @@
 
+import os
 from telegram import ReplyKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+)
 
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = os.environ["9200651366:AAGOzolrB8Y09uqHGmz5t19Lmxegnd7XKHc"]
 
 keyboard = [
     ["🎮 Play", "💰 Check your balance"],
@@ -38,9 +45,20 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu))
-    app.run_polling()
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, menu)
+    )
+
+    external_url = os.environ["RENDER_EXTERNAL_URL"]
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),
+        url_path="telegram",
+        webhook_url=f"{external_url}/telegram",
+    )
 
 if __name__ == "__main__":
     main()
