@@ -13,13 +13,13 @@ from telegram.ext import (
 TOKEN = os.environ["BOT_TOKEN"]
 
 keyboard = [
-    ["🎮 Play"],
+    ["📝 Register"],
     ["💰 Check your balance"],
     ["💳 Deposit"],
     ["🏧 Withdrawal"],
     ["📜 Transaction History"],
-    ["📖 Instruction"],
-    ["📝 Register"]
+    ["🎮 Play"],
+    ["📖 Instruction"]
 ]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -34,13 +34,13 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
 
     responses = {
-        "🎮 Play": "🎮 Welcome! Bingo game is coming soon.",
+        "📝 Register": "📝 Registration feature is coming soon.",
         "💰 Check your balance": "💰 Your balance: 0 ETB",
         "💳 Deposit": "💳 Deposit feature is coming soon.",
         "🏧 Withdrawal": "🏧 Withdrawal feature is coming soon.",
         "📜 Transaction History": "📜 No transactions yet.",
-        "📖 Instruction": "📖 Register first, then play Bingo.",
-        "📝 Register": "📝 Registration successful!"
+        "🎮 Play": "🎮 Welcome! Bingo game is coming soon.",
+        "📖 Instruction": "📖 Register first, then play Bingo."
     }
 
     await update.message.reply_text(
