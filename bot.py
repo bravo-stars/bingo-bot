@@ -135,6 +135,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
     if choice == "🎮 Play":
+        keys = [
+            [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
+            ["🏠 Other Rooms"],
+            ["⬅️ Back"]
+        ]
+        await update.message.reply_text(
+            "🎮 PLAY\\n1–700 ያሉ Cartela ቁጥሮችን ለመምረጥ ከታች ያለውን ቁልፍ ተጫን።",
+            reply_markup=ReplyKeyboardMarkup(keys, resize_keyboard=True)
+        )
+    elif choice == "🏠 Other Rooms":
         await update.message.reply_text("🕹 Choose a room:", reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True))
     elif choice == "🎮 Play Demo":
         keys = [[KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))], ["⬅️ Back"]]
