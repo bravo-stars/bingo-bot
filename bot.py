@@ -28,7 +28,8 @@ DB_PATH = os.environ.get("DATABASE_PATH", "bingo.sqlite3")
 WEBHOOK_SECRET = hashlib.sha256(TOKEN.encode()).hexdigest()[:40]
 
 MAIN_MENU = [
-    ["🎮 Play"],
+    [KeyboardButton("🎮 Play", web_app=WebAppInfo(url=BASE_URL + "/"))],
+    ["🏠 Other Rooms"],
     ["💰 Check your balance"],
     ["💳 Deposit"],
     ["🏧 Withdrawal"],
