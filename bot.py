@@ -170,10 +170,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
-    choice = message.text
-    logger.info("Menu message received: %s", choice)
+    choice = (message.text or "").strip()
+    normalized = choice.replace("\uFE0F", "").replace("\u200D", "").casefold()
+    logger.info("Menu message received: %r (normalized=%r)", choice, normalized)
 
-    if choice == "🎮 Play":
+    if "play" in normalized or normalized in {"🎮", "play game"}:
         keys = [
             [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
             ["🏠 Other Rooms"],
@@ -183,12 +184,12 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎮 PLAY\n1–700 ያሉ Cartela ቁጥሮችን ለመምረጥ ከታች ያለውን ቁልፍ ተጫን።",
             reply_markup=ReplyKeyboardMarkup(keys, resize_keyboard=True)
         )
-    elif choice == "🏠 Other Rooms":
+    elif "other rooms" in normalized or normalized == "🏠":
         await message.reply_text(
             "🕹 Choose a room:",
             reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True)
         )
-    elif choice == "🎮 Play Demo":
+    elif "play demo" in normalized:
         keys = [
             [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
             ["⬅️ Back"]
@@ -197,17 +198,17 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎮 PLAY DEMO\n1–700 ውስጥ እስከ 2 Cartela ምረጥ።",
             reply_markup=ReplyKeyboardMarkup(keys, resize_keyboard=True)
         )
-    elif choice == "🌟 Super Bingo":
+    elif "super bingo" in normalized:
         await message.reply_text(
             "🌟 SUPER BINGO\nDemo information only.\nWin when all numbers on your Cartela are called.",
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
-    elif choice == "🎁 BravoBingo Bonus":
+    elif "bravobingo bonus" in normalized:
         await message.reply_text(
             "🎁 BRAVOBINGO BONUS\n⚽ Football Match Prediction\n1️⃣ Home win\n2️⃣ Draw\n3️⃣ Away win\nDemo only. No real payments or prizes.",
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
-    elif choice == "⬅️ Back":
+    elif "back" in normalized or normalized == "⬅":
         await start(update, context)
     else:
         replies = {
