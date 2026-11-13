@@ -28,8 +28,7 @@ DB_PATH = os.environ.get("DATABASE_PATH", "bingo.sqlite3")
 WEBHOOK_SECRET = hashlib.sha256(TOKEN.encode()).hexdigest()[:40]
 
 MAIN_MENU = [
-    [KeyboardButton("🎮 Play", web_app=WebAppInfo(url=BASE_URL + "/"))],
-    ["🏠 Other Rooms"],
+    ["🎮 Play"],
     ["💰 Check your balance"],
     ["💳 Deposit"],
     ["🏧 Withdrawal"],
@@ -176,18 +175,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Menu message received: %r (normalized=%r)", choice, normalized)
 
     if "play" in normalized or normalized in {"🎮", "play game"}:
-        keys = [
-            [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
-            ["🏠 Other Rooms"],
-            ["⬅️ Back"]
-        ]
         await message.reply_text(
-            "🎮 PLAY\n1–700 ያሉ Cartela ቁጥሮችን ለመምረጥ ከታች ያለውን ቁልፍ ተጫን።",
-            reply_markup=ReplyKeyboardMarkup(keys, resize_keyboard=True)
-        )
-    elif "other rooms" in normalized or normalized == "🏠":
-        await message.reply_text(
-            "🕹 Choose a room:",
+            "🎮 PLAY — Choose a room:",
             reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True)
         )
     elif "play demo" in normalized:
