@@ -1,3 +1,4 @@
+
 import os
 import asyncio
 import random
@@ -8,12 +9,12 @@ from telegram import (
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
-    CallbackQueryHandler, filters, ContextTypes
+    CallbackQueryHandler, ContextTypes, filters
 )
 
 TOKEN = os.environ["BOT_TOKEN"]
 
-keyboard = [
+MAIN_MENU = [
     ["🎮 Play"],
     ["💰 Check your balance"],
     ["💳 Deposit"],
@@ -23,169 +24,202 @@ keyboard = [
     ["👤 Register"]
 ]
 
-rooms = [
+ROOMS = [
     ["🎮 Play Demo"],
     ["🌟 Super Bingo"],
     ["🎁 BravoBingo Bonus"],
     ["⬅️ Back"]
 ]
 
-back = [["⬅️ Back"]]
+BACK = [["⬅️ Back"]]
 
-game = {
-    "players": {},
-    "called": set(),
-    "started": False,
-    "finished": False,
-    "countdown_task": None
-}
+players = {}
+called = set()
+game_started = False
+game_finished = False
+game_task = None
 
 
-def make_card():
-    columns = [
-        random.sample(range(1, 16), 5),
-        random.sample(range(16, 31), 5),
-        random.sample(range(31, 46), 5),
-        random.sample(range(46, 61), 5),
-        random.sample(range(61, 76), 5)
-    ]
-    columns[2][2] = 0
-    return [
-        [columns[c][r] for c in range(5)]
-        for r in range(5)
-    ]
+def number_keyboard(player):
+    used = set()
+    for card in player["cards"]:
+        used.update(card)
 
+    used.update(player["draft"])
 
-def card_text(card):
-    text = " B   I   N   G   O\n"
-    for row in card:
-        text += " ".join(
-            "⭐" if n == 0 else f"{n:2}"
-            for n in row
-        ) + "\n"
-    return text
-
-
-def picker_keyboard(player):
     buttons = []
-    for i in range(6):
-        mark = "✅" if i in player["selected"] else "⬜"
-        buttons.append([
+    row = []
+
+    for n in range(1, 76):
+        if n in used:
+            continue
+
+        mark = "✅" if n in player["draft"] else str(n)
+        row.append(
             InlineKeyboardButton(
-                f"{mark} Cartela {i + 1}",
-                callback_data=f"pick:{i}"
+                mark, callback_data=f"num:{n}"
             )
-        ])
+        )
+
+        if len(row) == 5:
+            buttons.append(row)
+            row = []
+
+    if row:
+        buttons.append(row)
 
     buttons.append([
         InlineKeyboardButton(
-            "✅ Confirm selection",
-            callback_data="confirm"
+            f"Confirm ({len(player['draft'])}/24)",
+            callback_data="done"
         )
     ])
+
     return InlineKeyboardMarkup(buttons)
 
 
-async def show_picker(update, context):
-    user_id = update.effective_user.id
+def show_card(numbers):
+    values = sorted(numbers)
+    values.insert(12, 0)
 
-    if game["started"] or game["finished"]:
+    text = " B    I    N    G    O\n"
+    for r in range(5):
+        line = []
+        for c in range(5):
+            n = values[r * 5 + c]
+            line.append("FREE" if n == 0 else str(n))
+        text += " | ".join(line) + "\n"
+
+    return text
+
+
+async def choose_cards(update, context):
+    if game_started or game_finished:
         await update.message.reply_text(
-            "⏳ This demo game has already started or finished."
+            "The demo game is already closed."
         )
         return
 
-    if user_id not in game["players"]:
-        game["players"][user_id] = {
-            "chat_id": update.effective_chat.id,
-            "options": [make_card() for _ in range(6)],
-            "selected": set(),
-            "cards": [],
-            "confirmed": False
-        }
+    user_id = update.effective_user.id
 
-    player = game["players"][user_id]
+    players[user_id] = {
+        "chat_id": update.effective_chat.id,
+        "target": 0,
+        "cards": [],
+        "draft": set(),
+        "ready": False
+    }
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                "1 Cartela", callback_data="count:1"
+            ),
+            InlineKeyboardButton(
+                "2 Cartela", callback_data="count:2"
+            )
+        ]
+    ]
 
     await update.message.reply_text(
-        "🎮 Choose up to 2 Cartelas from these 6:\n\n"
-        + "\n".join(
-            f"Cartela {i + 1}\n{card_text(card)}"
-            for i, card in enumerate(player["options"])
-        ),
-        reply_markup=picker_keyboard(player)
+        "🎮 PLAY DEMO\nHow many Cartelas do you want?",
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 
-async def start_countdown(app):
-    for seconds in (30, 20, 10, 5):
-        if game["finished"]:
-            return
-        for player in game["players"].values():
-            if player["confirmed"]:
+async def begin_card(query, player):
+    player["draft"] = set()
+    card_no = len(player["cards"]) + 1
+
+    await query.edit_message_text(
+        f"🎟 CARTELA {card_no}\n"
+        "Choose exactly 24 numbers from 1 to 75.\n"
+        "The center will be FREE.\n"
+        "Numbers already used on your first Cartela "
+        "cannot be selected again.",
+        reply_markup=number_keyboard(player)
+    )
+
+
+def has_won(card):
+    values = list(card)
+    values.insert(12, 0)
+
+    for r in range(5):
+        line = values[r * 5:r * 5 + 5]
+        if all(n == 0 or n in called for n in line):
+            return "LINE"
+
+    corners = [values[0], values[4], values[20], values[24]]
+    if all(n in called for n in corners):
+        return "4 CORNERS"
+
+    return None
+
+
+async def run_game(app):
+    global game_started, game_finished, called
+
+    for seconds in (30, 20, 10):
+        for player in list(players.values()):
+            if player["ready"]:
                 await app.bot.send_message(
                     player["chat_id"],
-                    f"⏳ Demo game starts in {seconds} seconds!"
+                    f"⏳ Game starts in {seconds} seconds!"
                 )
-        await asyncio.sleep(10 if seconds != 5 else 5)
+        await asyncio.sleep(10)
 
-    game["started"] = True
+    game_started = True
 
-    for player in game["players"].values():
-        if player["confirmed"]:
+    for player in list(players.values()):
+        if player["ready"]:
             await app.bot.send_message(
-                player["chat_id"],
-                "🎮 GAME STARTED!\nNumbers will be called every 3 seconds."
+                player["chat_id"], "🎮 GAME STARTED!"
             )
 
     numbers = list(range(1, 76))
     random.shuffle(numbers)
 
     for number in numbers:
-        if game["finished"]:
-            return
+        if game_finished:
+            break
 
-        game["called"].add(number)
+        called.add(number)
+        winners = {}
 
-        winners = []
-        for user_id, player in game["players"].items():
-            if not player["confirmed"]:
+        for user_id, player in players.items():
+            if not player["ready"]:
                 continue
 
-            for card_number, card in enumerate(player["cards"], 1):
-                patterns = []
+            patterns = []
+            for index, card in enumerate(player["cards"], 1):
+                result = has_won(card)
+                if result:
+                    patterns.append(f"Cartela {index}: {result}")
 
-                for row in card:
-                    if all(n == 0 or n in game["called"] for n in row):
-                        patterns.append("LINE")
+            if patterns:
+                winners[user_id] = patterns
 
-                corners = [
-                    card[0][0], card[0][4],
-                    card[4][0], card[4][4]
-                ]
-                if all(n in game["called"] for n in corners):
-                    patterns.append("4 CORNERS")
-
-                if patterns:
-                    winners.append(
-                        (player["chat_id"], card_number, patterns)
-                    )
-
-        message = f"🔢 Number called: {number}"
-        for player in game["players"].values():
-            if player["confirmed"]:
-                await app.bot.send_message(player["chat_id"], message)
-
-        if winners:
-            game["finished"] = True
-            result = "🏆 GAME OVER! WINNER(S):\n"
-            for chat_id, card_number, patterns in winners:
-                result += (
-                    f"Cartela {card_number}: "
-                    f"{', '.join(patterns)}\n"
+        for player in list(players.values()):
+            if player["ready"]:
+                await app.bot.send_message(
+                    player["chat_id"],
+                    f"🔢 CALLED NUMBER: {number}\n"
+                    f"Numbers called: {len(called)}"
                 )
 
-            for player in game["players"].values():
-                if player["confirmed"]:
+        if winners:
+            game_finished = True
+
+            result = "🏆 BINGO! WINNER(S):\n"
+            for user_id, patterns in winners.items():
+                result += (
+                    f"Player {user_id}: "
+                    + ", ".join(patterns) + "\n"
+                )
+
+            for player in list(players.values()):
+                if player["ready"]:
                     await app.bot.send_message(
                         player["chat_id"], result
                     )
@@ -193,75 +227,99 @@ async def start_countdown(app):
 
         await asyncio.sleep(3)
 
-    game["finished"] = True
-    for player in game["players"].values():
-        if player["confirmed"]:
+    game_finished = True
+
+    for player in list(players.values()):
+        if player["ready"]:
             await app.bot.send_message(
                 player["chat_id"],
-                "Game finished. No winner this time."
+                "Game finished. No winner."
             )
 
 
-async def button_handler(update, context):
+async def buttons(update, context):
+    global game_task
+
     query = update.callback_query
     await query.answer()
 
     user_id = query.from_user.id
-    player = game["players"].get(user_id)
+    player = players.get(user_id)
 
     if not player:
-        await query.answer("Please press Play Demo first.", show_alert=True)
+        await query.answer(
+            "Press Play Demo first.", show_alert=True
+        )
         return
 
-    if game["started"] or game["finished"]:
-        await query.edit_message_text("This game is already closed.")
+    if game_started or game_finished:
+        await query.answer(
+            "Game already started.", show_alert=True
+        )
         return
 
-    if query.data.startswith("pick:"):
-        if player["confirmed"]:
-            return
+    data = query.data
 
-        index = int(query.data.split(":")[1])
+    if data.startswith("count:"):
+        player["target"] = int(data.split(":")[1])
+        await begin_card(query, player)
+        return
 
-        if index in player["selected"]:
-            player["selected"].remove(index)
-        elif len(player["selected"]) < 2:
-            player["selected"].add(index)
+    if data.startswith("num:"):
+        n = int(data.split(":")[1])
+
+        if n in player["draft"]:
+            player["draft"].remove(n)
+        elif len(player["draft"]) < 24:
+            player["draft"].add(n)
         else:
             await query.answer(
-                "You can select only 2 Cartelas.",
+                "You already selected 24 numbers.",
                 show_alert=True
             )
             return
 
         await query.edit_message_reply_markup(
-            reply_markup=picker_keyboard(player)
+            reply_markup=number_keyboard(player)
         )
         return
 
-    if query.data == "confirm":
-        if not player["selected"]:
+    if data == "done":
+        if len(player["draft"]) != 24:
             await query.answer(
-                "Choose at least 1 Cartela.",
+                "Please select exactly 24 numbers.",
                 show_alert=True
             )
             return
 
-        player["cards"] = [
-            player["options"][i]
-            for i in sorted(player["selected"])
-        ]
-        player["confirmed"] = True
+        player["cards"].append(sorted(player["draft"]))
+
+        if len(player["cards"]) < player["target"]:
+            await begin_card(query, player)
+            return
+
+        player["ready"] = True
+
+        card_messages = ""
+        for i, card in enumerate(player["cards"], 1):
+            card_messages += (
+                f"\n🎟 CARTELA {i}\n{show_card(card)}"
+            )
 
         await query.edit_message_text(
-            "✅ Cartela selection confirmed!\n"
-            f"You selected {len(player['cards'])} Cartela(s).\n"
-            "Wait for the game to start."
+            "✅ Your Cartela selection is complete!"
+            + card_messages
         )
 
-        if game["countdown_task"] is None:
-            game["countdown_task"] = asyncio.create_task(
-                start_countdown(context.application)
+        await context.bot.send_message(
+            player["chat_id"],
+            "You joined the demo game!\n"
+            "The game starts 30 seconds after the first player joins."
+        )
+
+        if game_task is None:
+            game_task = asyncio.create_task(
+                run_game(context.application)
             )
 
 
@@ -269,7 +327,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🎉 Welcome to Bingo Bot!\nChoose an option:",
         reply_markup=ReplyKeyboardMarkup(
-            keyboard, resize_keyboard=True
+            MAIN_MENU, resize_keyboard=True
         )
     )
 
@@ -279,23 +337,22 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if choice == "🎮 Play":
         await update.message.reply_text(
-            "🕹 PLAY IN:\nChoose a room:",
+            "🕹 Choose a room:",
             reply_markup=ReplyKeyboardMarkup(
-                rooms, resize_keyboard=True
+                ROOMS, resize_keyboard=True
             )
         )
         return
 
     if choice == "🎮 Play Demo":
-        await show_picker(update, context)
+        await choose_cards(update, context)
         return
 
     if choice == "🌟 Super Bingo":
         await update.message.reply_text(
-            "🌟 SUPER BINGO\n"
-            "Demo only. The player wins when every number "
-            "on their Cartela has been called.",
-            reply_markup=ReplyKeyboardMarkup(back, resize_keyboard=True)
+            "🌟 SUPER BINGO\nDemo information only.\n"
+            "Win when all numbers on your Cartela are called.",
+            reply_markup=ReplyKeyboardMarkup(BACK, resize_keyboard=True)
         )
         return
 
@@ -303,12 +360,9 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🎁 BRAVOBINGO BONUS\n"
             "⚽ Football Match Prediction\n"
-            "1️⃣ Home team wins\n"
-            "2️⃣ Draw\n"
-            "3️⃣ Away team wins\n\n"
-            "Demo prize pool: 10,000 ETB\n"
-            "Demo only: no real payments or prizes.",
-            reply_markup=ReplyKeyboardMarkup(back, resize_keyboard=True)
+            "1️⃣ Home win\n2️⃣ Draw\n3️⃣ Away win\n"
+            "Demo only. No real payments or prizes.",
+            reply_markup=ReplyKeyboardMarkup(BACK, resize_keyboard=True)
         )
         return
 
@@ -316,17 +370,17 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
 
-    responses = {
-        "💰 Check your balance": "💰 Demo balance: 0 ETB",
-        "💳 Deposit": "💳 Deposits are not available in demo.",
-        "🏧 Withdrawal": "🏧 Withdrawals are not available in demo.",
-        "📜 Transaction History": "📜 No transactions yet.",
-        "📖 Instruction": "📖 Choose a game room, then follow its instructions.",
-        "👤 Register": "👤 Registration is coming soon."
+    replies = {
+        "💰 Check your balance": "Demo balance: 0 ETB",
+        "💳 Deposit": "Deposits are not available in demo.",
+        "🏧 Withdrawal": "Withdrawals are not available in demo.",
+        "📜 Transaction History": "No transactions yet.",
+        "📖 Instruction": "Choose a room and follow the instructions.",
+        "👤 Register": "Registration is coming soon."
     }
 
     await update.message.reply_text(
-        responses.get(choice, "Please choose a menu button.")
+        replies.get(choice, "Please choose a menu button.")
     )
 
 
@@ -334,9 +388,7 @@ async def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(
-        CallbackQueryHandler(button_handler)
-    )
+    app.add_handler(CallbackQueryHandler(buttons))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu)
     )
@@ -350,7 +402,7 @@ async def main():
         listen="0.0.0.0",
         port=port,
         url_path="telegram",
-        webhook_url=f"{external_url}/telegram",
+        webhook_url=f"{external_url}/telegram"
     )
 
     try:
