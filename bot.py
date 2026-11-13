@@ -3,11 +3,8 @@ import os
 import asyncio
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ContextTypes,
+    Application, CommandHandler, MessageHandler,
+    filters, ContextTypes
 )
 
 TOKEN = os.environ["BOT_TOKEN"]
@@ -24,10 +21,12 @@ keyboard = [
 
 rooms = [
     ["🎮 Play Demo"],
-    ["🌟 Super Bingo Demo"],
+    ["🌟 Super Bingo"],
     ["🎁 BravoBingo Bonus"],
     ["⬅️ Back"]
 ]
+
+back = [["⬅️ Back"]]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -42,16 +41,46 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if choice == "🎮 Play":
         await update.message.reply_text(
-            "🕹 PLAY IN:\nChoose a room to join the demo game.",
+            "🕹 PLAY IN:\nChoose a room:",
             reply_markup=ReplyKeyboardMarkup(
                 rooms, resize_keyboard=True
             )
         )
         return
 
-    if choice in rooms[0] + rooms[1] + rooms[2]:
+    if choice == "🎮 Play Demo":
         await update.message.reply_text(
-            f"🎮 {choice}\n\nDemo room selected!\nGame setup is coming soon."
+            "🎮 PLAY DEMO\n"
+            "LINE: Complete one horizontal line.\n"
+            "4 CORNERS: Complete all four corners.\n"
+            "This is a free demo game.",
+            reply_markup=ReplyKeyboardMarkup(back, resize_keyboard=True)
+        )
+        return
+
+    if choice == "🌟 Super Bingo":
+        await update.message.reply_text(
+            "🌟 SUPER BINGO\n"
+            "Entry price: 50 ETB (demo only)\n"
+            "The player wins when every number on "
+            "their Cartela has been called.\n"
+            "This is not a real-money game yet.",
+            reply_markup=ReplyKeyboardMarkup(back, resize_keyboard=True)
+        )
+        return
+
+    if choice == "🎁 BravoBingo Bonus":
+        await update.message.reply_text(
+            "🎁 BRAVOBINGO BONUS\n"
+            "⚽ Football Match Prediction\n"
+            "Predict the match result:\n"
+            "1️⃣ Home team wins\n"
+            "2️⃣ Draw\n"
+            "3️⃣ Away team wins\n\n"
+            "Demo prize pool: 10,000 ETB\n"
+            "Correct predictions share the prize pool.\n"
+            "Demo only: no real payments or prizes.",
+            reply_markup=ReplyKeyboardMarkup(back, resize_keyboard=True)
         )
         return
 
@@ -61,11 +90,11 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     responses = {
         "💰 Check your balance": "💰 Demo balance: 0 ETB",
-        "💳 Deposit": "💳 Demo deposit is not available.",
-        "🏧 Withdrawal": "🏧 Demo withdrawal is not available.",
+        "💳 Deposit": "💳 Deposits are not available in demo.",
+        "🏧 Withdrawal": "🏧 Withdrawals are not available in demo.",
         "📜 Transaction History": "📜 No transactions yet.",
-        "📖 Instruction": "📖 Register first, then play Bingo.",
-        "👤 Register": "👤 Registration feature is coming soon."
+        "📖 Instruction": "📖 Choose a game room, then follow its instructions.",
+        "👤 Register": "👤 Registration is coming soon."
     }
 
     await update.message.reply_text(
@@ -74,7 +103,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     app = Application.builder().token(TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu)
