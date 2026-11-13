@@ -36,7 +36,7 @@ MAIN_MENU = [
     ["📖 Instruction"],
     ["👤 Register"]
 ]
-ROOMS = [["🎮 Play Demo"], ["🌟 Super Bingo"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
+ROOMS = [["🎮 Play | 10"], ["🌟 Super Bingo | 50"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
 
 
 # ---------- DATABASE ----------
@@ -174,12 +174,12 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     normalized = choice.replace("\uFE0F", "").replace("\u200D", "").casefold()
     logger.info("Menu message received: %r (normalized=%r)", choice, normalized)
 
-    if "play" in normalized or normalized in {"🎮", "play game"}:
+    if normalized in {"🎮 play", "play", "🎮", "play game"}:
         await message.reply_text(
             "🎮 PLAY — Choose a room:",
             reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True)
         )
-    elif "play demo" in normalized:
+    elif "play | 10" in normalized or "play demo" in normalized:
         keys = [
             [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
             ["⬅️ Back"]
