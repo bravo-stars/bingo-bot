@@ -37,6 +37,7 @@ MAIN_MENU = [
     ["👤 Register"]
 ]
 ROOMS = [["🎮 Play | 10"], ["🌟 Super Bingo | 50"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
+DEPOSIT_METHODS = [["📱 TELE-Birr"], ["🏦 CBE-Birr"], ["⬅️ Back"]]
 
 
 # ---------- DATABASE ----------
@@ -163,7 +164,7 @@ async def select_tickets(request):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("/start received from Telegram user %s", update.effective_user.id if update.effective_user else "unknown")
     await update.effective_message.reply_text(
-        "🎉 Welcome to Bingo Bot!\nChoose an option:",
+        "🎉 Welcome to BravoBingo!\nChoose an option:",
         reply_markup=ReplyKeyboardMarkup(MAIN_MENU, resize_keyboard=True)
     )
 
@@ -198,12 +199,26 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎁 BRAVOBINGO BONUS\n⚽ Football Match Prediction\n1️⃣ Home win\n2️⃣ Draw\n3️⃣ Away win\nDemo only. No real payments or prizes.",
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
+    elif normalized in {"💳 deposit", "deposit"}:
+        await message.reply_text(
+            "💳 BravoBingo Deposit\\nየማስገቢያ መንገድ ይምረጡ:",
+            reply_markup=ReplyKeyboardMarkup(DEPOSIT_METHODS, resize_keyboard=True)
+        )
+    elif "tele-birr" in normalized:
+        await message.reply_text(
+            "📱 TELE-Birr\\nስልክ ቁጥር: 0945723383\\nAccount Name: Samuel Adino\\n\\nከከፈሉ በኋላ የክፍያ ማረጋገጫውን Admin ያነጋግሩ።",
+            reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
+        )
+    elif "cbe-birr" in normalized:
+        await message.reply_text(
+            "🏦 CBE-Birr\\nስልክ ቁጥር: 0945723383\\nAccount Name: Samuel Adino\\n\\nከከፈሉ በኋላ የክፍያ ማረጋገጫውን Admin ያነጋግሩ።",
+            reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
+        )
     elif "back" in normalized or normalized == "⬅":
         await start(update, context)
     else:
         replies = {
             "💰 Check your balance": "Demo balance: 0 ETB",
-            "💳 Deposit": "Deposits are not available in demo.",
             "🏧 Withdrawal": "Withdrawals are not available in demo.",
             "📜 Transaction History": "No transactions yet.",
             "📖 Instruction": "Choose a room and follow the instructions.",
