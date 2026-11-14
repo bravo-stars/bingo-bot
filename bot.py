@@ -6,6 +6,7 @@ import sqlite3
 import random
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qsl
 
 from aiohttp import web
@@ -26,6 +27,7 @@ BASE_URL = os.environ["RENDER_EXTERNAL_URL"].rstrip("/")
 PORT = int(os.environ.get("PORT", "10000"))
 DB_PATH = os.environ.get("DATABASE_PATH", "bingo.sqlite3")
 WEBHOOK_SECRET = hashlib.sha256(TOKEN.encode()).hexdigest()[:40]
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "7504691975"))
 
 MAIN_MENU = [
     ["🎮 Play"],
@@ -53,6 +55,29 @@ def init_db():
             ticket_no INTEGER PRIMARY KEY,
             user_id INTEGER NOT NULL,
             card_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS deposit_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            method TEXT NOT NULL,
+            sms_text TEXT NOT NULL,
+            sms_hash TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'pending',
+            amount_cents INTEGER,
+            created_at TEXT NOT NULL,
+            reviewed_at TEXT
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS wallets (
+            user_id INTEGER PRIMARY KEY,
+            balance_cents INTEGER NOT NULL DEFAULT 0
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS wallet_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            amount_cents INTEGER NOT NULL,
+            description TEXT NOT NULL,
             created_at TEXT NOT NULL
         )""")
     logger.info("Database initialized")
@@ -162,6 +187,7 @@ async def select_tickets(request):
 
 # ---------- TELEGRAM BOT HANDLERS ----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.pop("awaiting_deposit_sms", None)
     logger.info("/start received from Telegram user %s", update.effective_user.id if update.effective_user else "unknown")
     await update.effective_message.reply_text(
         "🎉 Welcome to BravoBingo!\nChoose an option:",
@@ -174,6 +200,53 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = (message.text or "").strip()
     normalized = choice.replace("\uFE0F", "").replace("\u200D", "").casefold()
     logger.info("Menu message received: %r (normalized=%r)", choice, normalized)
+
+    awaiting_method = context.user_data.get("awaiting_deposit_sms")
+    menu_labels = {
+        "🎮 play", "play", "🎮", "play game", "💰 check your balance",
+        "💳 deposit", "deposit", "🏧 withdrawal", "📜 transaction history",
+        "📖 instruction", "👤 register", "⬅", "⬅️ back",
+        "📱 tele-birr", "🏦 cbe-birr"
+    }
+    if awaiting_method and normalized not in menu_labels and choice:
+        uid = update.effective_user.id
+        sms_text = choice[:3500]
+        sms_hash = hashlib.sha256(sms_text.strip().encode("utf-8")).hexdigest()
+        try:
+            with db() as con:
+                cur = con.execute(
+                    """INSERT INTO deposit_requests
+                       (user_id,method,sms_text,sms_hash,created_at)
+                       VALUES(?,?,?,?,?)""",
+                    (uid, awaiting_method, sms_text, sms_hash, datetime.now(timezone.utc).isoformat())
+                )
+                request_id = cur.lastrowid
+        except sqlite3.IntegrityError:
+            context.user_data.pop("awaiting_deposit_sms", None)
+            await message.reply_text("ይህ SMS ከዚህ በፊት ተልኳል። Admin እንዲያረጋግጥ ይጠብቁ።")
+            return
+        context.user_data.pop("awaiting_deposit_sms", None)
+        user = update.effective_user
+        admin_text = (
+            f"💳 BravoBingo Deposit Request #{request_id}\n"
+            f"User ID: {uid}\n"
+            f"Name: {user.full_name}\n"
+            f"Username: @{user.username or 'none'}\n"
+            f"Method: {awaiting_method}\n\n"
+            f"Payment SMS:\n{sms_text}\n\n"
+            f"Approve: /approve_deposit {request_id} AMOUNT_ETB\n"
+            f"Reject: /reject_deposit {request_id}"
+        )
+        try:
+            await context.bot.send_message(chat_id=ADMIN_ID, text=admin_text)
+        except Exception:
+            logger.exception("Could not notify admin about deposit request %s", request_id)
+            await message.reply_text("SMS ተመዝግቧል፣ ግን Admin ማሳወቂያ አልተላከም። እባክዎ Admin ያነጋግሩ።")
+            return
+        await message.reply_text(
+            f"✅ የDeposit ጥያቄዎ #{request_id} ተልኳል። Admin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።"
+        )
+        return
 
     if normalized in {"🎮 play", "play", "🎮", "play game"}:
         await message.reply_text(
@@ -200,31 +273,142 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
     elif normalized in {"💳 deposit", "deposit"}:
+        context.user_data.pop("awaiting_deposit_sms", None)
         await message.reply_text(
-            "💳 BravoBingo Deposit\\nየማስገቢያ መንገድ ይምረጡ:",
+            "💳 BravoBingo Deposit\nየማስገቢያ መንገድ ይምረጡ:",
             reply_markup=ReplyKeyboardMarkup(DEPOSIT_METHODS, resize_keyboard=True)
         )
-    elif "tele-birr" in normalized:
+    elif "tele-birr" in normalized or "cbe-birr" in normalized:
+        method = "TELE-Birr" if "tele-birr" in normalized else "CBE-Birr"
+        context.user_data["awaiting_deposit_sms"] = method
         await message.reply_text(
-            "📱 TELE-Birr\\nስልክ ቁጥር: 0945723383\\nAccount Name: Samuel Adino\\n\\nከከፈሉ በኋላ የክፍያ ማረጋገጫውን Admin ያነጋግሩ።",
-            reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
-        )
-    elif "cbe-birr" in normalized:
-        await message.reply_text(
-            "🏦 CBE-Birr\\nስልክ ቁጥር: 0945723383\\nAccount Name: Samuel Adino\\n\\nከከፈሉ በኋላ የክፍያ ማረጋገጫውን Admin ያነጋግሩ።",
+            f"💳 {method}\n"
+            "ስልክ ቁጥር: 0945723383\n"
+            "Account Name: Samuel Adino\n\n"
+            "1. በላይ ባለው ቁጥር ክፍያ ይፈጽሙ።\n"
+            "2. ከክፍያው በኋላ የደረሰዎትን SMS ሙሉ በሙሉ Copy ያድርጉ።\n"
+            "3. SMS-ውን እዚህ ይላኩ።\n\n"
+            "Admin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።",
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
     elif "back" in normalized or normalized == "⬅":
         await start(update, context)
     else:
+        if choice == "💰 Check your balance":
+            with db() as con:
+                row = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (update.effective_user.id,)).fetchone()
+            balance = (row["balance_cents"] if row else 0) / 100
+            await message.reply_text(f"💰 Your BravoBingo balance: {balance:.2f} ETB")
+            return
+        if choice == "📜 Transaction History":
+            with db() as con:
+                rows = con.execute(
+                    "SELECT kind,amount_cents,description,created_at FROM wallet_transactions WHERE user_id=? ORDER BY id DESC LIMIT 10",
+                    (update.effective_user.id,)
+                ).fetchall()
+            if not rows:
+                await message.reply_text("No transactions yet.")
+            else:
+                lines = ["📜 Recent transactions:"]
+                for row in rows:
+                    lines.append(f"{row['created_at'][:16]} | {row['kind']} | {row['amount_cents']/100:.2f} ETB | {row['description']}")
+                await message.reply_text("\n".join(lines))
+            return
         replies = {
-            "💰 Check your balance": "Demo balance: 0 ETB",
-            "🏧 Withdrawal": "Withdrawals are not available in demo.",
-            "📜 Transaction History": "No transactions yet.",
+            "🏧 Withdrawal": "Withdrawals are not available yet.",
             "📖 Instruction": "Choose a room and follow the instructions.",
             "👤 Register": "Registration is coming soon."
         }
         await message.reply_text(replies.get(choice, "Please choose a menu button."))
+
+
+async def approve_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or update.effective_user.id != ADMIN_ID:
+        await update.effective_message.reply_text("Not authorized.")
+        return
+    if len(context.args) != 2:
+        await update.effective_message.reply_text("Usage: /approve_deposit REQUEST_ID AMOUNT_ETB")
+        return
+    try:
+        request_id = int(context.args[0])
+        amount = Decimal(context.args[1])
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidOperation()
+        cents_decimal = amount * 100
+        if cents_decimal != cents_decimal.to_integral_value():
+            raise InvalidOperation()
+        amount_cents = int(cents_decimal)
+    except (ValueError, InvalidOperation):
+        await update.effective_message.reply_text("Invalid amount. Example: /approve_deposit 12 100")
+        return
+
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT user_id,status FROM deposit_requests WHERE id=?", (request_id,)).fetchone()
+        if not row:
+            con.rollback()
+            await update.effective_message.reply_text("Deposit request not found.")
+            return
+        if row["status"] != "pending":
+            con.rollback()
+            await update.effective_message.reply_text(f"Request #{request_id} is already {row['status']}.")
+            return
+        uid = row["user_id"]
+        con.execute(
+            "UPDATE deposit_requests SET status='approved',amount_cents=?,reviewed_at=? WHERE id=? AND status='pending'",
+            (amount_cents, datetime.now(timezone.utc).isoformat(), request_id)
+        )
+        con.execute(
+            "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET balance_cents=balance_cents+excluded.balance_cents",
+            (uid, amount_cents)
+        )
+        con.execute(
+            "INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)",
+            (uid, "DEPOSIT", amount_cents, f"Deposit request #{request_id}", datetime.now(timezone.utc).isoformat())
+        )
+        con.commit()
+    except Exception:
+        con.rollback()
+        logger.exception("Failed to approve deposit request %s", request_id)
+        await update.effective_message.reply_text("Approval failed. Check server logs.")
+        return
+    finally:
+        con.close()
+    await update.effective_message.reply_text(f"✅ Request #{request_id} approved: {amount_cents/100:.2f} ETB credited.")
+    try:
+        await context.bot.send_message(chat_id=uid, text=f"✅ Your deposit #{request_id} was approved. {amount_cents/100:.2f} ETB has been added to your BravoBingo Wallet.")
+    except Exception:
+        logger.exception("Could not notify user %s about approved deposit", uid)
+
+
+async def reject_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or update.effective_user.id != ADMIN_ID:
+        await update.effective_message.reply_text("Not authorized.")
+        return
+    if len(context.args) != 1:
+        await update.effective_message.reply_text("Usage: /reject_deposit REQUEST_ID")
+        return
+    try:
+        request_id = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text("Invalid request ID.")
+        return
+    with db() as con:
+        cur = con.execute(
+            "UPDATE deposit_requests SET status='rejected',reviewed_at=? WHERE id=? AND status='pending'",
+            (datetime.now(timezone.utc).isoformat(), request_id)
+        )
+        row = con.execute("SELECT user_id FROM deposit_requests WHERE id=?", (request_id,)).fetchone()
+    if cur.rowcount != 1:
+        await update.effective_message.reply_text("Request not found or already reviewed.")
+        return
+    await update.effective_message.reply_text(f"Request #{request_id} rejected.")
+    if row:
+        try:
+            await context.bot.send_message(chat_id=row["user_id"], text=f"❌ Your deposit request #{request_id} was rejected. Please contact the admin if you think this is a mistake.")
+        except Exception:
+            logger.exception("Could not notify user about rejected deposit %s", request_id)
 
 
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -290,6 +474,8 @@ def main():
 
     telegram_app = Application.builder().token(TOKEN).build()
     telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("approve_deposit", approve_deposit))
+    telegram_app.add_handler(CommandHandler("reject_deposit", reject_deposit))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu))
     telegram_app.add_error_handler(handle_error)
 
