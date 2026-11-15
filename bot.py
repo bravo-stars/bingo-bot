@@ -74,6 +74,16 @@ def init_db():
             user_id INTEGER PRIMARY KEY,
             balance_cents INTEGER NOT NULL DEFAULT 0
         )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS bot_users (
+            user_id INTEGER PRIMARY KEY, full_name TEXT NOT NULL, username TEXT,
+            registered_at TEXT NOT NULL
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS withdrawal_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+            method TEXT NOT NULL, amount_cents INTEGER NOT NULL,
+            account_details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL, reviewed_at TEXT
+        )""")
 
         con.execute("""CREATE TABLE IF NOT EXISTS game_rounds (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -420,6 +430,98 @@ async def select_tickets(request):
         con.close()
 
 # ---------- TELEGRAM BOT HANDLERS ----------
+
+async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    with db() as con:
+        row = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
+    balance = (row["balance_cents"] if row else 0) / 100
+    await update.effective_message.reply_text(f"💰 Your BravoBingo balance: {balance:.2f} ETB")
+
+
+async def play(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.effective_message.reply_text("🎮 PLAY — Choose a room:", reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True))
+
+
+async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.pop("awaiting_deposit_sms", None)
+    await update.effective_message.reply_text("💳 BravoBingo Deposit\nየማስገቢያ መንገድ ይምረጡ:", reply_markup=ReplyKeyboardMarkup(DEPOSIT_METHODS, resize_keyboard=True))
+
+
+async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    with db() as con:
+        rows = con.execute("SELECT kind,amount_cents,description,created_at FROM wallet_transactions WHERE user_id=? ORDER BY id DESC LIMIT 10", (update.effective_user.id,)).fetchall()
+    if not rows:
+        await update.effective_message.reply_text("📜 ገና የግብይት ታሪክ የለም።")
+        return
+    lines = ["📜 Recent transactions:"]
+    for row in rows:
+        lines.append(f"{row['created_at'][:16]} | {row['kind']} | {row['amount_cents']/100:.2f} ETB | {row['description']}")
+    await update.effective_message.reply_text("\n".join(lines))
+
+
+async def instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.effective_message.reply_text("📖 BravoBingo Instructions\n1. Deposit money and wait for Admin approval.\n2. Open 🎮 Play | VIP.\n3. Choose 1 or 2 Cartelas (10 ETB each).\n4. Wait for the 30-second selection timer to finish.\n5. Match called numbers to your Cartela.\n6. Winners receive their share in Wallet.")
+
+
+async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    with db() as con:
+        con.execute("INSERT INTO bot_users(user_id,full_name,username,registered_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET full_name=excluded.full_name, username=excluded.username",
+                    (user.id, user.full_name[:200], user.username, datetime.now(timezone.utc).isoformat()))
+    await update.effective_message.reply_text("✅ BravoBingo account registered. Your Telegram account is linked.")
+
+
+async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.effective_message.reply_text("🏧 Withdrawal method ይምረጡ:", reply_markup=ReplyKeyboardMarkup([["📱 TELE-Birr"], ["🏦 CBE-Birr"], ["⬅️ Back"]], resize_keyboard=True))
+    context.user_data["withdrawal_method_pending"] = True
+
+
+async def approve_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or update.effective_user.id != ADMIN_ID:
+        await update.effective_message.reply_text("Not authorized."); return
+    if len(context.args) != 1:
+        await update.effective_message.reply_text("Usage: /approve_withdrawal REQUEST_ID"); return
+    try: rid = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text("Invalid request ID."); return
+    with db() as con:
+        cur = con.execute("UPDATE withdrawal_requests SET status='paid',reviewed_at=? WHERE id=? AND status='pending'", (datetime.now(timezone.utc).isoformat(), rid))
+        row = con.execute("SELECT user_id,amount_cents FROM withdrawal_requests WHERE id=?", (rid,)).fetchone()
+    if cur.rowcount != 1:
+        await update.effective_message.reply_text("Request not found or already reviewed."); return
+    await update.effective_message.reply_text(f"✅ Withdrawal #{rid} marked paid.")
+    try: await context.bot.send_message(chat_id=row["user_id"], text=f"✅ Withdrawal #{rid}: {row['amount_cents']/100:.2f} ETB paid.")
+    except Exception: logger.exception("Withdrawal notification failed")
+
+
+async def reject_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or update.effective_user.id != ADMIN_ID:
+        await update.effective_message.reply_text("Not authorized."); return
+    if len(context.args) != 1:
+        await update.effective_message.reply_text("Usage: /reject_withdrawal REQUEST_ID"); return
+    try: rid = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text("Invalid request ID."); return
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT user_id,amount_cents,status FROM withdrawal_requests WHERE id=?", (rid,)).fetchone()
+        if not row or row["status"] != "pending":
+            con.rollback(); await update.effective_message.reply_text("Request not found or already reviewed."); return
+        con.execute("UPDATE wallets SET balance_cents=balance_cents+? WHERE user_id=?", (row["amount_cents"], row["user_id"]))
+        con.execute("INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)", (row["user_id"], "WITHDRAWAL_REFUND", row["amount_cents"], f"Withdrawal #{rid} refund", datetime.now(timezone.utc).isoformat()))
+        con.execute("UPDATE withdrawal_requests SET status='rejected',reviewed_at=? WHERE id=?", (datetime.now(timezone.utc).isoformat(), rid))
+        con.commit()
+    except Exception:
+        con.rollback(); logger.exception("Withdrawal refund failed"); await update.effective_message.reply_text("Refund failed."); return
+    finally: con.close()
+    await update.effective_message.reply_text(f"Request #{rid} rejected; {row['amount_cents']/100:.2f} ETB refunded.")
+    try: await context.bot.send_message(chat_id=row["user_id"], text=f"❌ Withdrawal #{rid} rejected. {row['amount_cents']/100:.2f} ETB returned to your Wallet.")
+    except Exception: logger.exception("Refund notification failed")
+
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("awaiting_deposit_sms", None)
     logger.info("/start received from Telegram user %s", update.effective_user.id if update.effective_user else "unknown")
@@ -431,6 +533,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
+    withdrawal_step = context.user_data.get("withdrawal_step")
+    if withdrawal_step == "amount":
+        try:
+            amount = Decimal(choice); cents = amount * 100
+            if not amount.is_finite() or amount <= 0 or cents != cents.to_integral_value(): raise InvalidOperation()
+            amount_cents = int(cents)
+        except (InvalidOperation, ValueError):
+            await message.reply_text("ትክክለኛ የብር መጠን ያስገቡ።"); return
+        with db() as con:
+            wallet = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (update.effective_user.id,)).fetchone()
+        balance = wallet['balance_cents'] if wallet else 0
+        if amount_cents > balance:
+            await message.reply_text(f"Balanceዎ {balance/100:.2f} ETB ብቻ ነው።"); return
+        context.user_data['withdrawal_amount_cents'] = amount_cents
+        context.user_data['withdrawal_step'] = 'account'
+        await message.reply_text('የሚቀበሉበት ቁጥር እና Account Name ይላኩ።'); return
+    if withdrawal_step == 'account':
+        uid = update.effective_user.id; amount_cents = int(context.user_data.get('withdrawal_amount_cents', 0)); method = context.user_data.get('withdrawal_method'); details = choice.strip()[:500]
+        con = db()
+        try:
+            con.execute('BEGIN IMMEDIATE')
+            cur = con.execute('UPDATE wallets SET balance_cents=balance_cents-? WHERE user_id=? AND balance_cents>=?', (amount_cents, uid, amount_cents))
+            if cur.rowcount != 1: con.rollback(); await message.reply_text('በቂ Balance የለዎትም።'); return
+            cur = con.execute('INSERT INTO withdrawal_requests(user_id,method,amount_cents,account_details,created_at) VALUES(?,?,?,?,?)', (uid, method, amount_cents, details, datetime.now(timezone.utc).isoformat()))
+            rid = cur.lastrowid
+            con.execute('INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)', (uid,'WITHDRAWAL_HOLD',-amount_cents,f'Withdrawal #{rid}',datetime.now(timezone.utc).isoformat()))
+            con.commit()
+        except Exception:
+            con.rollback(); logger.exception('Withdrawal request failed'); await message.reply_text('Withdrawal አልተሳካም።'); return
+        finally: con.close()
+        for key in ('withdrawal_step','withdrawal_amount_cents','withdrawal_method'): context.user_data.pop(key,None)
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f'🏧 WITHDRAWAL #{rid}\\nUser: {uid}\\nMethod: {method}\\nAmount: {amount_cents/100:.2f} ETB\\nAccount: {details}\\nApprove after payment: /approve_withdrawal {rid}\\nReject/refund: /reject_withdrawal {rid}')
+        await message.reply_text(f'✅ Withdrawal #{rid} ተመዝግቧል። {amount_cents/100:.2f} ETB ከWallet ተይዟል።'); return
+
     awaiting_method = context.user_data.get("awaiting_deposit_sms")
     if not awaiting_method:
         return
@@ -556,6 +692,14 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎁 BRAVOBINGO BONUS\n⚽ Football Match Prediction\n1️⃣ Home win\n2️⃣ Draw\n3️⃣ Away win\nDemo only. No real payments or prizes.",
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
+    elif normalized in {"🏧 withdrawal", "withdrawal"}:
+        context.user_data["withdrawal_method_pending"] = True
+        await withdraw(update, context)
+    elif ("tele-birr" in normalized or "cbe-birr" in normalized) and context.user_data.get("withdrawal_method_pending"):
+        context.user_data["withdrawal_method"] = "TELE-Birr" if "tele-birr" in normalized else "CBE-Birr"
+        context.user_data.pop("withdrawal_method_pending", None)
+        context.user_data["withdrawal_step"] = "amount"
+        await message.reply_text("የሚወጣውን ብር መጠን ያስገቡ።")
     elif normalized in {"💳 deposit", "deposit"}:
         context.user_data.pop("awaiting_deposit_sms", None)
         await message.reply_text(
@@ -598,12 +742,11 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     lines.append(f"{row['created_at'][:16]} | {row['kind']} | {row['amount_cents']/100:.2f} ETB | {row['description']}")
                 await message.reply_text("\n".join(lines))
             return
-        replies = {
-            "🏧 Withdrawal": "Withdrawals are not available yet.",
-            "📖 Instruction": "Choose a room and follow the instructions.",
-            "👤 Register": "Registration is coming soon."
-        }
-        await message.reply_text(replies.get(choice, "Please choose a menu button."))
+        if choice == "📖 Instruction":
+            await instructions(update, context); return
+        if choice == "👤 Register":
+            await register_user(update, context); return
+        await message.reply_text("Please choose a menu button.")
 
 
 async def approve_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -813,6 +956,12 @@ async def telegram_webhook(request):
 async def on_startup(webapp):
     application = webapp["telegram"]
     await application.initialize()
+    await application.bot.set_my_commands([
+        ("start", "Open BravoBingo menu"), ("play", "Play Bingo"),
+        ("balance", "Check wallet balance"), ("deposit", "Deposit money"),
+        ("withdraw", "Withdraw money"), ("history", "Transaction history"),
+        ("instructions", "How to play"), ("register", "Register account")
+    ])
 
     bot_info = await application.bot.get_me()
     logger.info("Connected to Telegram bot: @%s (id=%s)", bot_info.username, bot_info.id)
@@ -859,10 +1008,19 @@ def main():
 
     telegram_app = Application.builder().token(TOKEN).build()
     telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("play", play))
+    telegram_app.add_handler(CommandHandler("balance", show_balance))
+    telegram_app.add_handler(CommandHandler("deposit", deposit))
+    telegram_app.add_handler(CommandHandler("withdraw", withdraw))
+    telegram_app.add_handler(CommandHandler("history", history))
+    telegram_app.add_handler(CommandHandler("instructions", instructions))
+    telegram_app.add_handler(CommandHandler("register", register_user))
     telegram_app.add_handler(CommandHandler("admin", admin_panel))
     telegram_app.add_handler(CallbackQueryHandler(admin_panel_action, pattern=r"^admin:"))
     telegram_app.add_handler(CommandHandler("approve_deposit", approve_deposit))
     telegram_app.add_handler(CommandHandler("reject_deposit", reject_deposit))
+    telegram_app.add_handler(CommandHandler("approve_withdrawal", approve_withdrawal))
+    telegram_app.add_handler(CommandHandler("reject_withdrawal", reject_withdrawal))
     telegram_app.add_handler(MessageHandler(filters.PHOTO, deposit_photo))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu))
     telegram_app.add_error_handler(handle_error)
