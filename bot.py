@@ -268,6 +268,9 @@ async def ticket_status(request):
         ).fetchall()
     mine = [r["ticket_no"] for r in mine_rows]
     cards = {str(r["ticket_no"]): json.loads(r["card_json"]) for r in mine_rows}
+    with db() as con:
+        wallet = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
+    balance_etb = (wallet["balance_cents"] if wallet else 0) / 100
     return web.json_response({
         "round_id": round_info["id"],
         "status": round_info["status"],
@@ -278,6 +281,7 @@ async def ticket_status(request):
         "winner_user_id": round_info["winner_user_id"],
         "claimed": claimed,
         "mine": mine,
+        "balance_etb": balance_etb,
         "cards": cards
     })
 
@@ -288,8 +292,8 @@ async def select_tickets(request):
     nums = body.get("tickets")
     if not isinstance(nums, list) or not 1 <= len(nums) <= 2:
         raise web.HTTPBadRequest(text="Choose one or two Cartelas.")
-    if any(type(n) is not int or not 1 <= n <= 700 for n in nums) or len(set(nums)) != len(nums):
-        raise web.HTTPBadRequest(text="Choose distinct Cartela numbers from 1 to 700.")
+    if any(type(n) is not int or not 1 <= n <= 600 for n in nums) or len(set(nums)) != len(nums):
+        raise web.HTTPBadRequest(text="Choose distinct Cartela numbers from 1 to 600.")
 
     con = db()
     try:
