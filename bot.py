@@ -7,6 +7,7 @@ import hashlib
 import sqlite3
 import random
 import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qsl
@@ -429,6 +430,27 @@ async def select_tickets(request):
     finally:
         con.close()
 
+def extract_deposit_amount(sms_text):
+    """Extract a likely ETB amount from Telebirr/CBE receipt SMS; never treat it as proof."""
+    text = (sms_text or "").replace(",", "")
+    patterns = [
+        r"(?:ETB|Birr|birr|ብር)\\s*([0-9]+(?:\\.[0-9]{1,2})?)",
+        r"(?:received|credited|deposit(?:ed)?|paid|ተቀበሉ|ገባ|ገብቷል)[^0-9]{0,50}([0-9]+(?:\\.[0-9]{1,2})?)",
+        r"([0-9]+(?:\\.[0-9]{1,2})?)\\s*(?:ETB|Birr|birr|ብር)"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            try:
+                amount = Decimal(match.group(1))
+                cents = amount * 100
+                if amount > 0 and cents == cents.to_integral_value():
+                    return int(cents)
+            except (InvalidOperation, ValueError):
+                pass
+    return None
+
+
 # ---------- TELEGRAM BOT HANDLERS ----------
 
 async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -634,14 +656,15 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if awaiting_method and normalized not in menu_labels and choice:
         uid = update.effective_user.id
         sms_text = choice[:3500]
+        extracted_cents = extract_deposit_amount(sms_text)
         sms_hash = hashlib.sha256(sms_text.strip().encode("utf-8")).hexdigest()
         try:
             with db() as con:
                 cur = con.execute(
                     """INSERT INTO deposit_requests
-                       (user_id,method,sms_text,sms_hash,created_at)
-                       VALUES(?,?,?,?,?)""",
-                    (uid, awaiting_method, sms_text, sms_hash, datetime.now(timezone.utc).isoformat())
+                       (user_id,method,sms_text,sms_hash,amount_cents,created_at)
+                       VALUES(?,?,?,?,?,?)""",
+                    (uid, awaiting_method, sms_text, sms_hash, extracted_cents, datetime.now(timezone.utc).isoformat())
                 )
                 request_id = cur.lastrowid
         except sqlite3.IntegrityError:
@@ -657,7 +680,11 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Username: @{user.username or 'none'}\n"
             f"Method: {awaiting_method}\n\n"
             f"Payment SMS:\n{sms_text}\n\n"
-            f"Approve: /approve_deposit {request_id} AMOUNT_ETB\n"
+            f"🤖 Extracted amount: {extracted_cents/100:.2f} ETB\n" if extracted_cents is not None else
+            f"Payment SMS:\n{sms_text}\n\n🤖 Amount not detected automatically; check SMS manually.\n"
+        )
+        admin_text += (
+            f"Approve after verifying: /approve_deposit {request_id} AMOUNT_ETB\n"
             f"Reject: /reject_deposit {request_id}"
         )
         try:
@@ -666,8 +693,9 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.exception("Could not notify admin about deposit request %s", request_id)
             await message.reply_text("SMS ተመዝግቧል፣ ግን Admin ማሳወቂያ አልተላከም። እባክዎ Admin ያነጋግሩ።")
             return
+        detected_note = f"በSMS ውስጥ {extracted_cents/100:.2f} ብር ተለይቷል።" if extracted_cents is not None else "የብር መጠኑ በራስ-ሰር አልተለየም፤ Admin ያረጋግጣል።"
         await message.reply_text(
-            f"✅ የDeposit ጥያቄዎ #{request_id} ተልኳል። Admin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።"
+            f"✅ የDeposit ጥያቄዎ #{request_id} ተልኳል።\\n{detected_note}\\nAdmin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።"
         )
         return
 
