@@ -610,7 +610,7 @@ async def on_cleanup(webapp):
                 await task
             except asyncio.CancelledError:
                 pass
-        await application.bot.delete_webhook()
+        # Keep the webhook registered during Render restarts/deployments.
         await application.stop()
         await application.shutdown()
         logger.info("Telegram application stopped cleanly")
