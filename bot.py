@@ -1,4 +1,6 @@
 import os
+import asyncio
+import time
 import json
 import hmac
 import hashlib
@@ -38,7 +40,7 @@ MAIN_MENU = [
     ["📖 Instruction"],
     ["👤 Register"]
 ]
-ROOMS = [["🎮 Play | 10"], ["🌟 Super Bingo | 50"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
+ROOMS = [["🎮 Play | Free"], ["🌟 Super Bingo | Free"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
 DEPOSIT_METHODS = [["📱 TELE-Birr"], ["🏦 CBE-Birr"], ["⬅️ Back"]]
 
 
@@ -72,6 +74,29 @@ def init_db():
             user_id INTEGER PRIMARY KEY,
             balance_cents INTEGER NOT NULL DEFAULT 0
         )""")
+
+        con.execute("""CREATE TABLE IF NOT EXISTS game_rounds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT NOT NULL,
+            opens_at REAL NOT NULL,
+            closes_at REAL NOT NULL,
+            numbers_json TEXT NOT NULL DEFAULT '[]',
+            drawn_json TEXT NOT NULL DEFAULT '[]',
+            next_draw_at REAL,
+            winner_ticket INTEGER,
+            winner_user_id INTEGER,
+            finished_at REAL,
+            created_at TEXT NOT NULL
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS round_tickets (
+            round_id INTEGER NOT NULL,
+            ticket_no INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            card_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(round_id, ticket_no)
+        )""")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_round_tickets_user ON round_tickets(round_id,user_id)")
         con.execute("""CREATE TABLE IF NOT EXISTS wallet_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -127,6 +152,98 @@ def request_user(request):
     return verify_init_data(auth[4:])
 
 
+
+
+# ---------- FREE-PLAY ROUND ENGINE ----------
+def ensure_round():
+    now = time.time()
+    with db() as con:
+        row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
+        if row is None or (row["status"] == "finished" and row["finished_at"] is not None and now >= row["finished_at"] + 10):
+            cur = con.execute(
+                """INSERT INTO game_rounds(status,opens_at,closes_at,created_at)
+                   VALUES('open',?,?,?)""",
+                (now, now + 30, datetime.now(timezone.utc).isoformat())
+            )
+            row = con.execute("SELECT * FROM game_rounds WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def full_house(card, drawn):
+    called = set(drawn)
+    return all(value == "FREE" or value in called for row in card for value in row)
+
+
+async def game_loop():
+    while True:
+        try:
+            now = time.time()
+            con = db()
+            try:
+                con.execute("BEGIN IMMEDIATE")
+                row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
+                if row is None:
+                    con.execute(
+                        "INSERT INTO game_rounds(status,opens_at,closes_at,created_at) VALUES('open',?,?,?)",
+                        (now, now + 30, datetime.now(timezone.utc).isoformat())
+                    )
+                elif row["status"] == "finished":
+                    if row["finished_at"] is not None and now >= row["finished_at"] + 10:
+                        con.execute(
+                            "INSERT INTO game_rounds(status,opens_at,closes_at,created_at) VALUES('open',?,?,?)",
+                            (now, now + 30, datetime.now(timezone.utc).isoformat())
+                        )
+                elif row["status"] == "open" and now >= row["closes_at"]:
+                    count = con.execute("SELECT COUNT(*) FROM round_tickets WHERE round_id=?", (row["id"],)).fetchone()[0]
+                    if count == 0:
+                        con.execute("UPDATE game_rounds SET status='finished',finished_at=? WHERE id=?", (now, row["id"]))
+                    else:
+                        order = random.sample(range(1, 76), 75)
+                        con.execute(
+                            "UPDATE game_rounds SET status='drawing',numbers_json=?,next_draw_at=? WHERE id=?",
+                            (json.dumps(order), now + 3, row["id"])
+                        )
+                elif row["status"] == "drawing" and row["next_draw_at"] is not None and now >= row["next_draw_at"]:
+                    order = json.loads(row["numbers_json"])
+                    drawn = json.loads(row["drawn_json"])
+                    if len(drawn) < 75:
+                        drawn.append(order[len(drawn)])
+                        tickets = con.execute(
+                            "SELECT ticket_no,user_id,card_json FROM round_tickets WHERE round_id=? ORDER BY ticket_no",
+                            (row["id"],)
+                        ).fetchall()
+                        winner = None
+                        for ticket in tickets:
+                            if full_house(json.loads(ticket["card_json"]), drawn):
+                                winner = ticket
+                                break
+                        if winner:
+                            con.execute(
+                                """UPDATE game_rounds SET drawn_json=?,status='finished',
+                                   winner_ticket=?,winner_user_id=?,finished_at=?,next_draw_at=NULL WHERE id=?""",
+                                (json.dumps(drawn), winner["ticket_no"], winner["user_id"], now, row["id"])
+                            )
+                        elif len(drawn) >= 75:
+                            con.execute(
+                                "UPDATE game_rounds SET drawn_json=?,status='finished',finished_at=?,next_draw_at=NULL WHERE id=?",
+                                (json.dumps(drawn), now, row["id"])
+                            )
+                        else:
+                            con.execute(
+                                "UPDATE game_rounds SET drawn_json=?,next_draw_at=? WHERE id=?",
+                                (json.dumps(drawn), now + 3, row["id"])
+                            )
+                con.commit()
+            except Exception:
+                con.rollback()
+                logger.exception("Free-play game loop database error")
+            finally:
+                con.close()
+        except Exception:
+            logger.exception("Free-play game loop failed")
+        await asyncio.sleep(0.5)
+
+
 # ---------- WEB APP ROUTES ----------
 async def home(request):
     return web.FileResponse("webapp/index.html")
@@ -138,12 +255,29 @@ async def health(request):
 
 async def ticket_status(request):
     uid = request_user(request)
+    round_info = ensure_round()
     with db() as con:
-        claimed = [r["ticket_no"] for r in con.execute("SELECT ticket_no FROM tickets")]
-        mine = [r["ticket_no"] for r in con.execute(
-            "SELECT ticket_no FROM tickets WHERE user_id=? ORDER BY ticket_no", (uid,)
+        claimed = [r["ticket_no"] for r in con.execute(
+            "SELECT ticket_no FROM round_tickets WHERE round_id=? ORDER BY ticket_no", (round_info["id"],)
         )]
-    return web.json_response({"claimed": claimed, "mine": mine})
+        mine_rows = con.execute(
+            "SELECT ticket_no,card_json FROM round_tickets WHERE round_id=? AND user_id=? ORDER BY ticket_no",
+            (round_info["id"], uid)
+        ).fetchall()
+    mine = [r["ticket_no"] for r in mine_rows]
+    cards = {str(r["ticket_no"]): json.loads(r["card_json"]) for r in mine_rows}
+    return web.json_response({
+        "round_id": round_info["id"],
+        "status": round_info["status"],
+        "closes_at": round_info["closes_at"],
+        "next_draw_at": round_info["next_draw_at"],
+        "drawn": json.loads(round_info["drawn_json"]),
+        "winner_ticket": round_info["winner_ticket"],
+        "winner_user_id": round_info["winner_user_id"],
+        "claimed": claimed,
+        "mine": mine,
+        "cards": cards
+    })
 
 
 async def select_tickets(request):
@@ -158,32 +292,37 @@ async def select_tickets(request):
     con = db()
     try:
         con.execute("BEGIN IMMEDIATE")
+        round_row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
+        now = time.time()
+        if round_row is None or round_row["status"] != "open" or now >= round_row["closes_at"]:
+            raise web.HTTPConflict(text="Ticket selection is closed. Wait for the next round.")
+        round_id = round_row["id"]
         existing = {r["ticket_no"] for r in con.execute(
-            "SELECT ticket_no FROM tickets WHERE user_id=?", (uid,)
+            "SELECT ticket_no FROM round_tickets WHERE round_id=? AND user_id=?", (round_id, uid)
         )}
         add = [n for n in nums if n not in existing]
         if len(existing) + len(add) > 2:
-            raise web.HTTPBadRequest(text="You can own at most two Cartelas.")
+            raise web.HTTPBadRequest(text="You can own at most two Cartelas in one round.")
         for n in add:
             try:
                 con.execute(
-                    "INSERT INTO tickets(ticket_no,user_id,card_json,created_at) VALUES(?,?,?,?)",
-                    (n, uid, json.dumps(make_card()), datetime.now(timezone.utc).isoformat())
+                    "INSERT INTO round_tickets(round_id,ticket_no,user_id,card_json,created_at) VALUES(?,?,?,?,?)",
+                    (round_id, n, uid, json.dumps(make_card()), datetime.now(timezone.utc).isoformat())
                 )
             except sqlite3.IntegrityError:
                 raise web.HTTPConflict(text=f"Cartela {n} is already taken. Refresh and choose another.")
         rows = con.execute(
-            "SELECT ticket_no,card_json FROM tickets WHERE user_id=? ORDER BY ticket_no", (uid,)
+            "SELECT ticket_no,card_json FROM round_tickets WHERE round_id=? AND user_id=? ORDER BY ticket_no",
+            (round_id, uid)
         ).fetchall()
         result = {str(r["ticket_no"]): json.loads(r["card_json"]) for r in rows}
         con.commit()
-        return web.json_response({"ok": True, "tickets": result})
+        return web.json_response({"ok": True, "round_id": round_id, "tickets": result})
     except Exception:
         con.rollback()
         raise
     finally:
         con.close()
-
 
 # ---------- TELEGRAM BOT HANDLERS ----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,7 +392,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎮 PLAY — Choose a room:",
             reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True)
         )
-    elif "play | 10" in normalized or "play demo" in normalized:
+    elif "play | free" in normalized or "play | 10" in normalized or "play demo" in normalized:
         keys = [
             [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
             ["⬅️ Back"]
@@ -455,12 +594,20 @@ async def on_startup(webapp):
     )
 
     await application.start()
+    webapp["game_task"] = asyncio.create_task(game_loop())
     logger.info("Telegram application started")
 
 
 async def on_cleanup(webapp):
     application = webapp["telegram"]
     try:
+        task = webapp.get("game_task")
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         await application.bot.delete_webhook()
         await application.stop()
         await application.shutdown()
