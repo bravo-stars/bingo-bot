@@ -12,7 +12,7 @@ from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qsl
 
 from aiohttp import web
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 # ---------- LOGGING ----------
@@ -488,13 +488,10 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True)
         )
     elif "play | free" in normalized or "play | vip" in normalized or "play | 10" in normalized or "play demo" in normalized:
-        keys = [
-            [KeyboardButton("🎟 Open VIP Cartela 1–600", web_app=WebAppInfo(url=BASE_URL + "/"))],
-            ["⬅️ Back"]
-        ]
+        keys = [[InlineKeyboardButton("🎟 Open VIP Cartela 1–600", web_app=WebAppInfo(url=BASE_URL + "/"))]]
         await message.reply_text(
-            "🎮 PLAY DEMO\n1–700 ውስጥ እስከ 2 Cartela ምረጥ።",
-            reply_markup=ReplyKeyboardMarkup(keys, resize_keyboard=True)
+            "🎮 VIP ROOM\n1–600 ውስጥ እስከ 2 Cartela ምረጥ።\nከታች ያለውን Open VIP Cartela ቁልፍ ጫን።",
+            reply_markup=InlineKeyboardMarkup(keys)
         )
     elif "super bingo" in normalized:
         await message.reply_text(
