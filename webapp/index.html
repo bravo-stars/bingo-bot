@@ -54,7 +54,7 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
     <div class="stat room"><small>ROOM</small><strong>FREE PLAY</strong></div>
     <div class="stat"><small>SOLD</small><strong id="sold">0</strong></div>
     <div class="stat"><small>TIME</small><strong id="timer">30s</strong></div>
-    <div class="stat balance"><small>MODE</small><strong>NO CASH</strong></div>
+    <div class="stat balance"><small>BALANCE</small><strong id="balance">0.00 ETB</strong></div>
   </header>
   <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="calledNumbers"></div><div class="hint">FREE PLAY · Full house wins · Numbers called every 3 seconds</div></section>
   <main id="boardWrap"><div id="grid"></div></main>
@@ -68,7 +68,7 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
 </div>
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
-const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer');
+const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer'),balance=document.getElementById('balance');
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
 const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
 const authHeaders=()=>({Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')});
@@ -79,7 +79,7 @@ function updateSlots(){
 }
 function render(){
   grid.innerHTML='';
-  for(let n=1;n<=700;n++){
+  for(let n=1;n<=600;n++){
     const b=document.createElement('button');b.type='button';b.textContent=n;
     b.className='ticket'+(claimed.has(n)?' taken':'')+(selected.has(n)?' selected':'');
     b.disabled=claimed.has(n)||!game||game.status!=='open';
@@ -119,7 +119,7 @@ async function load(){
     const r=await fetch('/api/tickets',{headers:authHeaders()});if(!r.ok)throw Error(await r.text());
     const d=await r.json();
     if(lastRound!==d.round_id){lastRound=d.round_id;selected.clear();localSelections.clear();cardsBox.innerHTML='';}
-    game=d;claimed=new Set(d.claimed);
+    game=d;claimed=new Set(d.claimed);balance.textContent=Number(d.balance_etb||0).toFixed(2)+' ETB';
     localSelections=new Set([...localSelections].filter(n=>!claimed.has(n)||d.mine.includes(n)));
     selected=new Set([...d.mine,...localSelections]);
     cardsBox.innerHTML='';
