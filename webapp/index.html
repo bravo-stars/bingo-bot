@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>BravoBingo - Free Play</title>
+<title>BravoBingo - VIP Room</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{--ink:#253247;--muted:#718096;--panel:#e7edf5;--line:#cbd5e1;--white:#fff}
@@ -56,7 +56,7 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
     <div class="stat"><small>TIME</small><strong id="timer">30s</strong></div>
     <div class="stat balance"><small>BALANCE</small><strong id="balance">0.00 ETB</strong></div>
   </header>
-  <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="calledNumbers"></div><div class="hint">FREE PLAY · Full house wins · Numbers called every 3 seconds</div></section>
+  <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="calledNumbers"></div><div class="hint">VIP ROOM · Row, column, diagonal, or 4 corners wins · Numbers called every 3 seconds</div></section>
   <main id="boardWrap"><div id="grid"></div></main>
   <section id="bottom">
     <div class="slot" id="slot1"><div class="plus">+</div><div class="slotname">SLOT 1 EMPTY</div></div>
@@ -104,9 +104,11 @@ function renderGame(d){
     gameStatus.textContent='🔴 ROUND '+d.round_id+' · NUMBERS ARE BEING CALLED';
   }else{
     timer.textContent='END';
-    if(d.winner_ticket!==null&&d.winner_ticket!==undefined){
-      const mine=(d.winner_user_id===tg?.initDataUnsafe?.user?.id);
-      gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER: ')+'CARTELA '+d.winner_ticket;
+    const winners=d.winners||((d.winner_ticket!==null&&d.winner_ticket!==undefined)?[{ticket_no:d.winner_ticket,user_id:d.winner_user_id}]:[]);
+    if(winners.length){
+      const myId=Number(tg?.initDataUnsafe?.user?.id);
+      const mine=winners.some(w=>Number(w.user_id)===myId);
+      gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER(S): ')+winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
     }else gameStatus.textContent='ROUND '+d.round_id+' · No winner';
   }
   calledNumbers.innerHTML='';
