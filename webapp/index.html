@@ -120,6 +120,7 @@ async function load(){
     const d=await r.json();
     if(lastRound!==d.round_id){lastRound=d.round_id;selected.clear();localSelections.clear();cardsBox.innerHTML='';}
     game=d;claimed=new Set(d.claimed);
+    localSelections=new Set([...localSelections].filter(n=>!claimed.has(n)||d.mine.includes(n)));
     selected=new Set([...d.mine,...localSelections]);
     cardsBox.innerHTML='';
     for(const [n,c] of Object.entries(d.cards||{}))showCard(n,c);
