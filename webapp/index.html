@@ -76,6 +76,7 @@ const grid=document.getElementById('grid'),sold=document.getElementById('sold'),
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
 const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
 const currentNumber=document.getElementById('currentNumber'),winnerDetails=document.getElementById('winnerDetails');
+document.getElementById('gamePanel').style.display='none';
 const authHeaders=()=>({Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')});
 let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false,lastGridSignature='';
 function updateSlots(){
@@ -146,7 +147,7 @@ async function load(){
     if(d.status!=='open')message.textContent=d.status==='drawing'?'Please wait for the called numbers.':'Round finished. The next round will open shortly.';
     else if(d.mine.length)message.textContent='Your Cartelas: '+d.mine.join(', ');
     else message.textContent='Select up to two free Cartelas.';
-  }catch(e){message.textContent=e.message;gameStatus.textContent='Connection error: '+e.message;}
+  }catch(e){message.textContent='';gameStatus.textContent='';document.getElementById('gamePanel').style.display='none';}
   finally{loading=false;}
 }
 confirmBtn.onclick=async()=>{
