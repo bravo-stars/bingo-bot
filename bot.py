@@ -71,6 +71,9 @@ def init_db():
             created_at TEXT NOT NULL,
             reviewed_at TEXT
         )""")
+        deposit_columns = {r["name"] for r in con.execute("PRAGMA table_info(deposit_requests)")}
+        if "requested_amount_cents" not in deposit_columns:
+            con.execute("ALTER TABLE deposit_requests ADD COLUMN requested_amount_cents INTEGER")
         con.execute("""CREATE TABLE IF NOT EXISTS wallets (
             user_id INTEGER PRIMARY KEY,
             balance_cents INTEGER NOT NULL DEFAULT 0
@@ -603,9 +606,10 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with db() as con:
             cur = con.execute(
                 """INSERT INTO deposit_requests
-                   (user_id,method,sms_text,sms_hash,created_at)
-                   VALUES(?,?,?,?,?)""",
-                (uid, awaiting_method, proof_text, proof_hash, datetime.now(timezone.utc).isoformat())
+                   (user_id,method,sms_text,sms_hash,requested_amount_cents,created_at)
+                   VALUES(?,?,?,?,?,?)""",
+                (uid, awaiting_method, proof_text, proof_hash,
+                 context.user_data.get("deposit_requested_amount_cents"), datetime.now(timezone.utc).isoformat())
             )
             request_id = cur.lastrowid
     except sqlite3.IntegrityError:
@@ -621,6 +625,7 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Name: {user.full_name}\n"
         f"Username: @{user.username or 'none'}\n"
         f"Method: {awaiting_method}\n"
+        f"Requested amount: {(context.user_data.get('deposit_requested_amount_cents') or 0)/100:.2f} ETB\n"
         f"Caption: {caption_text or 'None'}\n\n"
         f"Approve: /approve_deposit {request_id} AMOUNT_ETB\n"
         f"Reject: /reject_deposit {request_id}"
@@ -653,6 +658,33 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📖 instruction", "👤 register", "⬅", "⬅️ back",
         "📱 tele-birr", "🏦 cbe-birr"
     }
+    if context.user_data.get("deposit_step") == "amount" and choice:
+        try:
+            amount = Decimal(choice.replace(",", "").strip())
+            cents = amount * 100
+            if not amount.is_finite() or amount < Decimal("10") or cents != cents.to_integral_value():
+                raise InvalidOperation()
+            requested_cents = int(cents)
+        except (InvalidOperation, ValueError):
+            await message.reply_text("❌ ቢያንስ 10 ETB ያስገቡ። ለምሳሌ: 50")
+            return
+        context.user_data["deposit_requested_amount_cents"] = requested_cents
+        context.user_data.pop("deposit_step", None)
+        method = context.user_data.get("deposit_method")
+        context.user_data["awaiting_deposit_sms"] = method
+        await message.reply_text(
+            f"💳 {method}\n"
+            f"የሚከፍሉት መጠን: {requested_cents/100:.2f} ETB\n"
+            "ስልክ ቁጥር: 0945723383\n"
+            "Account Name: Samuel Adino\n\n"
+            "1. ከላይ ያለውን ትክክለኛ መጠን ይክፈሉ።\n"
+            "2. ከክፍያው በኋላ Screenshot ይላኩ ወይም የደረሰዎትን SMS Copy/Paste ያድርጉ።\n"
+            "3. ከሁለቱ አንዱን ብቻ ይላኩ።\n\n"
+            "Admin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።",
+            reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
+        )
+        return
+
     if awaiting_method and normalized not in menu_labels and choice:
         uid = update.effective_user.id
         sms_text = choice[:3500]
@@ -662,9 +694,10 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             with db() as con:
                 cur = con.execute(
                     """INSERT INTO deposit_requests
-                       (user_id,method,sms_text,sms_hash,amount_cents,created_at)
-                       VALUES(?,?,?,?,?,?)""",
-                    (uid, awaiting_method, sms_text, sms_hash, extracted_cents, datetime.now(timezone.utc).isoformat())
+                       (user_id,method,sms_text,sms_hash,amount_cents,requested_amount_cents,created_at)
+                       VALUES(?,?,?,?,?,?,?)""",
+                    (uid, awaiting_method, sms_text, sms_hash, extracted_cents,
+                     context.user_data.get("deposit_requested_amount_cents"), datetime.now(timezone.utc).isoformat())
                 )
                 request_id = cur.lastrowid
         except sqlite3.IntegrityError:
@@ -678,7 +711,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"User ID: {uid}\n"
             f"Name: {user.full_name}\n"
             f"Username: @{user.username or 'none'}\n"
-            f"Method: {awaiting_method}\n\n"
+            f"Method: {awaiting_method}\n"
+            f"Requested amount: {(context.user_data.get('deposit_requested_amount_cents') or 0)/100:.2f} ETB\n\n"
             f"Payment SMS:\n{sms_text}\n\n"
             f"🤖 Extracted amount: {extracted_cents/100:.2f} ETB\n" if extracted_cents is not None else
             f"Payment SMS:\n{sms_text}\n\n🤖 Amount not detected automatically; check SMS manually.\n"
@@ -730,22 +764,23 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text("የሚወጣውን ብር መጠን ያስገቡ።")
     elif normalized in {"💳 deposit", "deposit"}:
         context.user_data.pop("awaiting_deposit_sms", None)
+        context.user_data.pop("deposit_step", None)
+        context.user_data.pop("deposit_method", None)
+        context.user_data.pop("deposit_requested_amount_cents", None)
         await message.reply_text(
             "💳 BravoBingo Deposit\nየማስገቢያ መንገድ ይምረጡ:",
             reply_markup=ReplyKeyboardMarkup(DEPOSIT_METHODS, resize_keyboard=True)
         )
     elif "tele-birr" in normalized or "cbe-birr" in normalized:
         method = "TELE-Birr" if "tele-birr" in normalized else "CBE-Birr"
-        context.user_data["awaiting_deposit_sms"] = method
+        context.user_data["deposit_method"] = method
+        context.user_data["deposit_step"] = "amount"
+        context.user_data.pop("awaiting_deposit_sms", None)
+        context.user_data.pop("deposit_requested_amount_cents", None)
         await message.reply_text(
             f"💳 {method}\n"
-            "ስልክ ቁጥር: 0945723383\n"
-            "Account Name: Samuel Adino\n\n"
-            "1. በላይ ባለው ቁጥር ክፍያ ይፈጽሙ።\n"
-            "2. ከክፍያው በኋላ Screenshot ይላኩ ወይም የደረሰዎትን SMS Copy/Paste ያድርጉ።\n"
-            "3. ከሁለቱ አንዱን ብቻ እዚህ ይላኩ።\n\n"
-            "Admin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።",
-            reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
+            "የሚያስገቡትን ብር መጠን ያስገቡ።\n"
+            "Minimum Deposit: 10 ETB"
         )
     elif "back" in normalized or normalized == "⬅":
         await start(update, context)
