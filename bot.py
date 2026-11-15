@@ -40,7 +40,7 @@ MAIN_MENU = [
     ["📖 Instruction"],
     ["👤 Register"]
 ]
-ROOMS = [["🎮 Play | Free"], ["🌟 Super Bingo | Free"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
+ROOMS = [[KeyboardButton("🎮 Play | Free", web_app=WebAppInfo(url=BASE_URL + "/"))], ["🌟 Super Bingo | Free"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
 DEPOSIT_METHODS = [["📱 TELE-Birr"], ["🏦 CBE-Birr"], ["⬅️ Back"]]
 
 
