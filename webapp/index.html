@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>BravoBingo - Play Demo</title>
+<title>BravoBingo - Free Play</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{--ink:#253247;--muted:#718096;--panel:#e7edf5;--line:#cbd5e1;--white:#fff}
@@ -20,7 +20,12 @@ body{font-family:Arial,Helvetica,sans-serif;background:#e5ebf3;color:var(--ink);
 .room strong{font-size:19px}
 .balance{background:#16a34a}
 .balance small{color:#e2fbe9}
-.balance strong{font-size:19px}
+.balance strong{font-size:16px}
+#gamePanel{padding:4px 14px 10px;background:#e5ebf3;text-align:center}
+#gameStatus{font-size:13px;font-weight:800;margin:2px 0 7px;color:#253247}
+#calledNumbers{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-height:54px;overflow:auto}
+.called{background:#344256;color:#fff;border-radius:7px;padding:4px 6px;font-size:11px;font-weight:800}
+#gamePanel .hint{font-size:10px;color:#718096;margin-top:5px}
 #boardWrap{flex:1;min-height:0;overflow-y:auto;margin:5px 26px 0;padding:18px 17px 22px;border:2px solid #aab8ca;border-radius:62px 62px 0 0;background:#dce4ee;box-shadow:inset 0 2px 6px rgba(35,50,71,.08)}
 #grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:14px 12px}
 .ticket{min-width:0;aspect-ratio:1/1;border:1px solid #d8e0e9;border-radius:15px;background:#fff;color:#202b3a;font-size:clamp(15px,3.5vw,25px);font-weight:800;box-shadow:0 2px 4px rgba(30,41,59,.12);padding:0}
@@ -46,11 +51,12 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="stat room"><small>ROOM</small><strong>VIP 💰💰</strong></div>
+    <div class="stat room"><small>ROOM</small><strong>FREE PLAY</strong></div>
     <div class="stat"><small>SOLD</small><strong id="sold">0</strong></div>
     <div class="stat"><small>TIME</small><strong id="timer">30s</strong></div>
-    <div class="stat balance"><small>BALANCE</small><strong>0.00 ETB</strong></div>
+    <div class="stat balance"><small>MODE</small><strong>NO CASH</strong></div>
   </header>
+  <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="calledNumbers"></div><div class="hint">FREE PLAY · Full house wins · Numbers called every 3 seconds</div></section>
   <main id="boardWrap"><div id="grid"></div></main>
   <section id="bottom">
     <div class="slot" id="slot1"><div class="plus">+</div><div class="slotname">SLOT 1 EMPTY</div></div>
@@ -64,30 +70,23 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer');
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
-const selected=new Set();let claimed=new Set();const headers={Authorization:'tma '+(tg?.initData||'')};
-let seconds=30;
+const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
+const headers={Authorization:'tma '+(tg?.initData||'')};
+let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false,lastGridSignature='';
 function updateSlots(){
   [1,2].forEach((i)=>{const el=document.getElementById('slot'+i),n=[...selected][i-1];el.classList.toggle('filled',!!n);el.innerHTML=n?'<div class="plus">🎟 '+n+'</div><div class="slotname">CARTELA '+n+'</div>':'<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';});
-  confirmBtn.disabled=selected.size===0;
+  confirmBtn.disabled=!game||game.status!=='open'||selected.size===0;
 }
 function render(){
   grid.innerHTML='';
   for(let n=1;n<=700;n++){
     const b=document.createElement('button');b.type='button';b.textContent=n;
     b.className='ticket'+(claimed.has(n)?' taken':'')+(selected.has(n)?' selected':'');
-    b.disabled=claimed.has(n);
-    b.onclick=()=>{if(selected.has(n))selected.delete(n);else if(selected.size<2)selected.add(n);else{message.textContent='Maximum two Cartelas.';return;}message.textContent='';render();};
+    b.disabled=claimed.has(n)||!game||game.status!=='open';
+    b.onclick=()=>{if(selected.has(n)){selected.delete(n);localSelections.delete(n);}else if(selected.size<2){selected.add(n);localSelections.add(n);}else{message.textContent='Maximum two Cartelas.';return;}message.textContent='';render();};
     grid.appendChild(b);
   }
   sold.textContent=claimed.size;updateSlots();
-}
-async function load(){
-  try{
-    if(!tg?.initData)throw Error('Please open this page from the Telegram bot.');
-    const r=await fetch('/api/tickets',{headers});if(!r.ok)throw Error(await r.text());
-    const d=await r.json();claimed=new Set(d.claimed);d.mine.forEach(n=>selected.add(n));
-    render();if(d.mine.length)message.textContent='Your Cartelas: '+d.mine.join(', ');
-  }catch(e){message.textContent=e.message;}
 }
 function showCard(no,rows){
   const box=document.createElement('div');box.className='card';const h=document.createElement('h3');h.textContent='Cartela '+no;box.appendChild(h);
@@ -95,16 +94,53 @@ function showCard(no,rows){
   for(const x of ['B','I','N','G','O']){const th=document.createElement('th');th.textContent=x;head.appendChild(th);}t.appendChild(head);
   for(const row of rows){const tr=document.createElement('tr');for(const x of row){const td=document.createElement('td');td.textContent=x;tr.appendChild(td);}t.appendChild(tr);}box.appendChild(t);cardsBox.appendChild(box);
 }
+function renderGame(d){
+  const now=Date.now()/1000;
+  if(d.status==='open'){
+    const left=Math.max(0,Math.ceil(d.closes_at-now));timer.textContent=left+'s';
+    gameStatus.textContent='🟢 ROUND '+d.round_id+' · Choose Cartelas · '+left+' seconds left';
+  }else if(d.status==='drawing'){
+    const left=Math.max(0,Math.ceil((d.next_draw_at||now)-now));timer.textContent=left+'s';
+    gameStatus.textContent='🔴 ROUND '+d.round_id+' · NUMBERS ARE BEING CALLED';
+  }else{
+    timer.textContent='END';
+    if(d.winner_ticket!==null&&d.winner_ticket!==undefined){
+      const mine=(d.winner_user_id===tg?.initDataUnsafe?.user?.id);
+      gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER: ')+'CARTELA '+d.winner_ticket;
+    }else gameStatus.textContent='ROUND '+d.round_id+' · No winner';
+  }
+  calledNumbers.innerHTML='';
+  (d.drawn||[]).forEach(n=>{const chip=document.createElement('span');chip.className='called';chip.textContent=n;calledNumbers.appendChild(chip);});
+}
+async function load(){
+  if(loading)return;loading=true;
+  try{
+    if(!tg?.initData)throw Error('Please open this page from the Telegram bot.');
+    const r=await fetch('/api/tickets',{headers});if(!r.ok)throw Error(await r.text());
+    const d=await r.json();
+    if(lastRound!==d.round_id){lastRound=d.round_id;selected.clear();localSelections.clear();cardsBox.innerHTML='';}
+    game=d;claimed=new Set(d.claimed);
+    localSelections=new Set([...localSelections].filter(n=>!claimed.has(n)||d.mine.includes(n)));
+    selected=new Set([...d.mine,...localSelections]);
+    cardsBox.innerHTML='';
+    for(const [n,c] of Object.entries(d.cards||{}))showCard(n,c);
+    renderGame(d);
+    const signature=JSON.stringify([d.round_id,d.status,d.claimed,d.mine,[...localSelections].sort((a,b)=>a-b)]);
+    if(signature!==lastGridSignature){lastGridSignature=signature;render();}
+    if(d.status!=='open')message.textContent=d.status==='drawing'?'Please wait for the called numbers.':'Round finished. The next round will open shortly.';
+    else if(d.mine.length)message.textContent='Your Cartelas: '+d.mine.join(', ');
+    else message.textContent='Select up to two free Cartelas.';
+  }catch(e){message.textContent=e.message;gameStatus.textContent='Game connection error';}
+  finally{loading=false;}
+}
 confirmBtn.onclick=async()=>{
-  confirmBtn.disabled=true;message.textContent='Saving Cartela...';
+  confirmBtn.disabled=true;message.textContent='Saving your free Cartela...';
   try{
     const r=await fetch('/api/select',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tickets:[...selected]})});
-    if(!r.ok)throw Error(await r.text());const d=await r.json();cardsBox.innerHTML='';
-    for(const [n,c] of Object.entries(d.tickets))showCard(n,c);
-    message.textContent='✅ Cartela selection saved.';claimed=new Set([...claimed,...selected]);render();
+    if(!r.ok)throw Error(await r.text());
+    localSelections.clear();message.textContent='✅ Cartela selection saved.';await load();
   }catch(e){message.textContent=e.message;await load();}
 };
-setInterval(()=>{seconds=seconds>0?seconds-1:30;timer.textContent=seconds+'s';},1000);
-load();
+load();setInterval(load,1000);
 </script>
 </body></html>
