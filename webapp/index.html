@@ -71,7 +71,7 @@ const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer');
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
 const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
-const headers={Authorization:'tma '+(tg?.initData||'')};
+const authHeaders=()=>({Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')});
 let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false,lastGridSignature='';
 function updateSlots(){
   [1,2].forEach((i)=>{const el=document.getElementById('slot'+i),n=[...selected][i-1];el.classList.toggle('filled',!!n);el.innerHTML=n?'<div class="plus">🎟 '+n+'</div><div class="slotname">CARTELA '+n+'</div>':'<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';});
@@ -116,7 +116,7 @@ async function load(){
   if(loading)return;loading=true;
   try{
     if(!tg?.initData)throw Error('Please open this page from the Telegram bot.');
-    const r=await fetch('/api/tickets',{headers});if(!r.ok)throw Error(await r.text());
+    const r=await fetch('/api/tickets',{headers:authHeaders()});if(!r.ok)throw Error(await r.text());
     const d=await r.json();
     if(lastRound!==d.round_id){lastRound=d.round_id;selected.clear();localSelections.clear();cardsBox.innerHTML='';}
     game=d;claimed=new Set(d.claimed);
@@ -130,13 +130,13 @@ async function load(){
     if(d.status!=='open')message.textContent=d.status==='drawing'?'Please wait for the called numbers.':'Round finished. The next round will open shortly.';
     else if(d.mine.length)message.textContent='Your Cartelas: '+d.mine.join(', ');
     else message.textContent='Select up to two free Cartelas.';
-  }catch(e){message.textContent=e.message;gameStatus.textContent='Game connection error';}
+  }catch(e){message.textContent=e.message;gameStatus.textContent='Connection error: '+e.message;}
   finally{loading=false;}
 }
 confirmBtn.onclick=async()=>{
   confirmBtn.disabled=true;message.textContent='Saving your free Cartela...';
   try{
-    const r=await fetch('/api/select',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tickets:[...selected]})});
+    const r=await fetch('/api/select',{method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({tickets:[...selected]})});
     if(!r.ok)throw Error(await r.text());
     localSelections.clear();message.textContent='✅ Cartela selection saved.';await load();
   }catch(e){message.textContent=e.message;await load();}
