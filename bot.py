@@ -97,6 +97,10 @@ def init_db():
             PRIMARY KEY(round_id, ticket_no)
         )""")
         con.execute("CREATE INDEX IF NOT EXISTS idx_round_tickets_user ON round_tickets(round_id,user_id)")
+        # Safe migration for storing every winner in the same draw.
+        columns = {r["name"] for r in con.execute("PRAGMA table_info(game_rounds)")}
+        if "winners_json" not in columns:
+            con.execute("ALTER TABLE game_rounds ADD COLUMN winners_json TEXT NOT NULL DEFAULT '[]'")
         con.execute("""CREATE TABLE IF NOT EXISTS wallet_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -171,9 +175,20 @@ def ensure_round():
         return dict(row)
 
 
-def full_house(card, drawn):
+def has_winning_pattern(card, drawn):
+    """Win on any complete row, column, diagonal, or all four corners."""
     called = set(drawn)
-    return all(value == "FREE" or value in called for row in card for value in row)
+    marked = [[value == "FREE" or value in called for value in row] for row in card]
+    # Five horizontal and five vertical lines.
+    if any(all(row) for row in marked):
+        return True
+    if any(all(marked[r][c] for r in range(5)) for c in range(5)):
+        return True
+    # Both diagonals.
+    if all(marked[i][i] for i in range(5)) or all(marked[i][4-i] for i in range(5)):
+        return True
+    # Four corner cells.
+    return marked[0][0] and marked[0][4] and marked[4][0] and marked[4][4]
 
 
 async def game_loop():
@@ -214,16 +229,20 @@ async def game_loop():
                             "SELECT ticket_no,user_id,card_json FROM round_tickets WHERE round_id=? ORDER BY ticket_no",
                             (row["id"],)
                         ).fetchall()
-                        winner = None
+                        winners = []
                         for ticket in tickets:
-                            if full_house(json.loads(ticket["card_json"]), drawn):
-                                winner = ticket
-                                break
-                        if winner:
+                            if has_winning_pattern(json.loads(ticket["card_json"]), drawn):
+                                winners.append({"ticket_no": ticket["ticket_no"], "user_id": ticket["user_id"]})
+                        if winners:
+                            # The round stops on this draw; everyone completing a pattern
+                            # with this same called number is recorded as a winner.
+                            first = winners[0]
                             con.execute(
                                 """UPDATE game_rounds SET drawn_json=?,status='finished',
-                                   winner_ticket=?,winner_user_id=?,finished_at=?,next_draw_at=NULL WHERE id=?""",
-                                (json.dumps(drawn), winner["ticket_no"], winner["user_id"], now, row["id"])
+                                   winner_ticket=?,winner_user_id=?,winners_json=?,finished_at=?,
+                                   next_draw_at=NULL WHERE id=?""",
+                                (json.dumps(drawn), first["ticket_no"], first["user_id"],
+                                 json.dumps(winners), now, row["id"])
                             )
                         elif len(drawn) >= 75:
                             con.execute(
@@ -279,6 +298,7 @@ async def ticket_status(request):
         "drawn": json.loads(round_info["drawn_json"]),
         "winner_ticket": round_info["winner_ticket"],
         "winner_user_id": round_info["winner_user_id"],
+        "winners": json.loads(round_info["winners_json"] or "[]"),
         "claimed": claimed,
         "mine": mine,
         "balance_etb": balance_etb,
