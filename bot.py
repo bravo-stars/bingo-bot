@@ -469,7 +469,8 @@ async def play(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.pop("awaiting_deposit_sms", None)
+    for key in ("awaiting_deposit_sms", "deposit_step", "deposit_method", "deposit_requested_amount_cents"):
+        context.user_data.pop(key, None)
     await update.effective_message.reply_text("💳 BravoBingo Deposit\nየማስገቢያ መንገድ ይምረጡ:", reply_markup=ReplyKeyboardMarkup(DEPOSIT_METHODS, resize_keyboard=True))
 
 
@@ -548,7 +549,8 @@ async def reject_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.pop("awaiting_deposit_sms", None)
+    for key in ("awaiting_deposit_sms", "deposit_step", "deposit_method", "deposit_requested_amount_cents"):
+        context.user_data.pop(key, None)
     logger.info("/start received from Telegram user %s", update.effective_user.id if update.effective_user else "unknown")
     await update.effective_message.reply_text(
         "🎉 Welcome to BravoBingo!\nChoose an option:",
@@ -619,13 +621,15 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data.pop("awaiting_deposit_sms", None)
     user = update.effective_user
+    requested_cents = context.user_data.pop("deposit_requested_amount_cents", None)
+    context.user_data.pop("deposit_method", None)
     admin_caption = (
         f"💳 BravoBingo Deposit Request #{request_id}\n"
         f"User ID: {uid}\n"
         f"Name: {user.full_name}\n"
         f"Username: @{user.username or 'none'}\n"
         f"Method: {awaiting_method}\n"
-        f"Requested amount: {(context.user_data.get('deposit_requested_amount_cents') or 0)/100:.2f} ETB\n"
+        f"Requested amount: {(requested_cents or 0)/100:.2f} ETB\n"
         f"Caption: {caption_text or 'None'}\n\n"
         f"Approve: /approve_deposit {request_id} AMOUNT_ETB\n"
         f"Reject: /reject_deposit {request_id}"
@@ -658,6 +662,12 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📖 instruction", "👤 register", "⬅", "⬅️ back",
         "📱 tele-birr", "🏦 cbe-birr"
     }
+    if context.user_data.get("deposit_step") == "amount" and normalized in {"⬅", "⬅️ back", "back"}:
+        for key in ("deposit_step", "deposit_method", "deposit_requested_amount_cents"):
+            context.user_data.pop(key, None)
+        await start(update, context)
+        return
+
     if context.user_data.get("deposit_step") == "amount" and choice:
         try:
             amount = Decimal(choice.replace(",", "").strip())
@@ -706,17 +716,21 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         context.user_data.pop("awaiting_deposit_sms", None)
         user = update.effective_user
+        requested_cents = context.user_data.pop("deposit_requested_amount_cents", None)
+        context.user_data.pop("deposit_method", None)
         admin_text = (
             f"💳 BravoBingo Deposit Request #{request_id}\n"
             f"User ID: {uid}\n"
             f"Name: {user.full_name}\n"
             f"Username: @{user.username or 'none'}\n"
             f"Method: {awaiting_method}\n"
-            f"Requested amount: {(context.user_data.get('deposit_requested_amount_cents') or 0)/100:.2f} ETB\n\n"
+            f"Requested amount: {(requested_cents or 0)/100:.2f} ETB\n\n"
             f"Payment SMS:\n{sms_text}\n\n"
-            f"🤖 Extracted amount: {extracted_cents/100:.2f} ETB\n" if extracted_cents is not None else
-            f"Payment SMS:\n{sms_text}\n\n🤖 Amount not detected automatically; check SMS manually.\n"
         )
+        if extracted_cents is not None:
+            admin_text += f"🤖 Extracted amount: {extracted_cents/100:.2f} ETB\n"
+        else:
+            admin_text += "🤖 Amount not detected automatically; check SMS manually.\n"
         admin_text += (
             f"Approve after verifying: /approve_deposit {request_id} AMOUNT_ETB\n"
             f"Reject: /reject_deposit {request_id}"
