@@ -107,12 +107,15 @@ function renderGame(d){
   currentNumber.classList.toggle('empty',!drawn.length);
   winnerDetails.textContent='';
   if(d.status==='open'){
+    document.getElementById('gamePanel').style.display='none';
     const left=Math.max(0,Math.ceil(d.closes_at-now));timer.textContent=left+'s';
     gameStatus.textContent='🟢 ROUND '+d.round_id+' · Choose Cartelas · '+left+' seconds left';
   }else if(d.status==='drawing'){
+    document.getElementById('gamePanel').style.display='block';
     const left=Math.max(0,Math.ceil((d.next_draw_at||now)-now));timer.textContent=left+'s';
     gameStatus.textContent='🔴 ROUND '+d.round_id+' · NUMBERS ARE BEING CALLED';
   }else{
+    document.getElementById('gamePanel').style.display='block';
     timer.textContent='END';
     const winners=d.winners||((d.winner_ticket!==null&&d.winner_ticket!==undefined)?[{ticket_no:d.winner_ticket,user_id:d.winner_user_id}]:[]);
     if(winners.length){
