@@ -158,6 +158,7 @@ def request_user(request):
 def ensure_round():
     now = time.time()
     with db() as con:
+        con.execute("BEGIN IMMEDIATE")
         row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
         if row is None or (row["status"] == "finished" and row["finished_at"] is not None and now >= row["finished_at"] + 10):
             cur = con.execute(
@@ -166,6 +167,7 @@ def ensure_round():
                 (now, now + 30, datetime.now(timezone.utc).isoformat())
             )
             row = con.execute("SELECT * FROM game_rounds WHERE id=?", (cur.lastrowid,)).fetchone()
+        con.commit()
         return dict(row)
 
 
