@@ -26,6 +26,10 @@ body{font-family:Arial,Helvetica,sans-serif;background:#e5ebf3;color:var(--ink);
 #calledNumbers{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-height:54px;overflow:auto}
 .called{background:#344256;color:#fff;border-radius:7px;padding:4px 6px;font-size:11px;font-weight:800}
 #gamePanel .hint{font-size:10px;color:#718096;margin-top:5px}
+#currentNumber{width:66px;height:66px;border-radius:50%;margin:5px auto 7px;display:flex;align-items:center;justify-content:center;background:#ffca24;color:#263247;font-size:30px;font-weight:900;border:4px solid #fff;box-shadow:0 3px 9px #0002}
+#currentNumber.empty{background:#344256;color:#fff;font-size:14px}
+.marked{background:#ffdf70;font-weight:900;color:#5a4300}
+#winnerDetails{font-size:12px;font-weight:800;color:#166534;margin-top:5px}
 #boardWrap{flex:1;min-height:0;overflow-y:auto;margin:5px 26px 0;padding:18px 17px 22px;border:2px solid #aab8ca;border-radius:62px 62px 0 0;background:#dce4ee;box-shadow:inset 0 2px 6px rgba(35,50,71,.08)}
 #grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:14px 12px}
 .ticket{min-width:0;aspect-ratio:1/1;border:1px solid #d8e0e9;border-radius:15px;background:#fff;color:#202b3a;font-size:clamp(15px,3.5vw,25px);font-weight:800;box-shadow:0 2px 4px rgba(30,41,59,.12);padding:0}
@@ -56,7 +60,7 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
     <div class="stat"><small>TIME</small><strong id="timer">30s</strong></div>
     <div class="stat balance"><small>BALANCE</small><strong id="balance">0.00 ETB</strong></div>
   </header>
-  <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="calledNumbers"></div><div class="hint">VIP ROOM · Row, column, diagonal, or 4 corners wins · Numbers called every 3 seconds</div></section>
+  <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="currentNumber" class="empty">WAIT</div><div id="winnerDetails"></div><div id="calledNumbers"></div><div class="hint">VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins</div></section>
   <main id="boardWrap"><div id="grid"></div></main>
   <section id="bottom">
     <div class="slot" id="slot1"><div class="plus">+</div><div class="slotname">SLOT 1 EMPTY</div></div>
@@ -71,6 +75,7 @@ const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer'),balance=document.getElementById('balance');
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
 const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
+const currentNumber=document.getElementById('currentNumber'),winnerDetails=document.getElementById('winnerDetails');
 const authHeaders=()=>({Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')});
 let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false,lastGridSignature='';
 function updateSlots(){
@@ -88,14 +93,19 @@ function render(){
   }
   sold.textContent=claimed.size;updateSlots();
 }
-function showCard(no,rows){
+function showCard(no,rows,drawn){
+  const called=new Set(drawn||[]);
   const box=document.createElement('div');box.className='card';const h=document.createElement('h3');h.textContent='Cartela '+no;box.appendChild(h);
   const t=document.createElement('table'),head=document.createElement('tr');
   for(const x of ['B','I','N','G','O']){const th=document.createElement('th');th.textContent=x;head.appendChild(th);}t.appendChild(head);
-  for(const row of rows){const tr=document.createElement('tr');for(const x of row){const td=document.createElement('td');td.textContent=x;tr.appendChild(td);}t.appendChild(tr);}box.appendChild(t);cardsBox.appendChild(box);
+  for(const row of rows){const tr=document.createElement('tr');for(const x of row){const td=document.createElement('td');td.textContent=x;if(x==='FREE'||called.has(x))td.className='marked';tr.appendChild(td);}t.appendChild(tr);}box.appendChild(t);cardsBox.appendChild(box);
 }
 function renderGame(d){
   const now=Date.now()/1000;
+  const drawn=d.drawn||[];
+  currentNumber.textContent=drawn.length?drawn[drawn.length-1]:'WAIT';
+  currentNumber.classList.toggle('empty',!drawn.length);
+  winnerDetails.textContent='';
   if(d.status==='open'){
     const left=Math.max(0,Math.ceil(d.closes_at-now));timer.textContent=left+'s';
     gameStatus.textContent='🟢 ROUND '+d.round_id+' · Choose Cartelas · '+left+' seconds left';
@@ -109,6 +119,7 @@ function renderGame(d){
       const myId=Number(tg?.initDataUnsafe?.user?.id);
       const mine=winners.some(w=>Number(w.user_id)===myId);
       gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER(S): ')+winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
+      winnerDetails.textContent=winners.map(w=>(w.user_name||('Player '+w.user_id))+' · Cartela '+w.ticket_no+' · '+(Number(w.prize_cents||0)/100).toFixed(2)+' ETB').join(' | ');
     }else gameStatus.textContent='ROUND '+d.round_id+' · No winner';
   }
   calledNumbers.innerHTML='';
@@ -125,7 +136,7 @@ async function load(){
     localSelections=new Set([...localSelections].filter(n=>!claimed.has(n)||d.mine.includes(n)));
     selected=new Set([...d.mine,...localSelections]);
     cardsBox.innerHTML='';
-    for(const [n,c] of Object.entries(d.cards||{}))showCard(n,c);
+    for(const [n,c] of Object.entries(d.cards||{}))showCard(n,c,d.drawn||[]);
     renderGame(d);
     const signature=JSON.stringify([d.round_id,d.status,d.claimed,d.mine,[...localSelections].sort((a,b)=>a-b)]);
     if(signature!==lastGridSignature){lastGridSignature=signature;render();}
@@ -136,10 +147,10 @@ async function load(){
   finally{loading=false;}
 }
 confirmBtn.onclick=async()=>{
-  confirmBtn.disabled=true;message.textContent='Saving your free Cartela...';
+  confirmBtn.disabled=true;message.textContent='Checking Wallet and buying Cartela...';
   try{
     const r=await fetch('/api/select',{method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({tickets:[...selected]})});
-    if(!r.ok)throw Error(await r.text());
+    if(!r.ok){const detail=await r.text();if(r.status===402)throw Error('Wallet balance is not enough. Deposit funds first.');throw Error(detail);}
     localSelections.clear();message.textContent='✅ Cartela selection saved.';await load();
   }catch(e){message.textContent=e.message;await load();}
 };
