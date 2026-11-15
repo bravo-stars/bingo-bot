@@ -157,6 +157,7 @@ confirmBtn.onclick=async()=>{
     localSelections.clear();message.textContent='✅ Cartela selection saved.';await load();
   }catch(e){message.textContent=e.message;await load();}
 };
+render(); // Show Cartelas 1–600 immediately, even while Telegram connection is loading.
 load();setInterval(load,1000);
 </script>
 </body></html>
