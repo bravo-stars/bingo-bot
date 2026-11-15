@@ -13,7 +13,7 @@ from urllib.parse import parse_qsl
 
 from aiohttp import web
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 # ---------- LOGGING ----------
 logging.basicConfig(
@@ -642,6 +642,99 @@ async def reject_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.exception("Could not notify user about rejected deposit %s", request_id)
 
 
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or update.effective_user.id != ADMIN_ID:
+        await update.effective_message.reply_text("⛔ Admin access only.")
+        return
+    keyboard = [
+        [InlineKeyboardButton("📊 Overview", callback_data="admin:overview"),
+         InlineKeyboardButton("💳 Pending deposits", callback_data="admin:deposits")],
+        [InlineKeyboardButton("👥 Users", callback_data="admin:users"),
+         InlineKeyboardButton("📜 Transactions", callback_data="admin:transactions")],
+        [InlineKeyboardButton("🎮 Game status", callback_data="admin:game")]
+    ]
+    await update.effective_message.reply_text(
+        "🛠 BravoBingo ADMIN PANEL\nChoose a section:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def admin_panel_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if not query:
+        return
+    if not update.effective_user or update.effective_user.id != ADMIN_ID:
+        await query.answer("Admin access only.", show_alert=True)
+        return
+    await query.answer()
+    action = (query.data or "").split(":", 1)[-1]
+    with db() as con:
+        if action == "overview":
+            users = con.execute("SELECT COUNT(*) FROM wallets").fetchone()[0]
+            wallet_total = con.execute("SELECT COALESCE(SUM(balance_cents),0) FROM wallets").fetchone()[0] / 100
+            pending = con.execute("SELECT COUNT(*) FROM deposit_requests WHERE status='pending'").fetchone()[0]
+            tickets = con.execute("SELECT COUNT(*) FROM round_tickets").fetchone()[0]
+            text_out = (
+                "📊 OVERVIEW\\n"
+                f"👥 Wallet users: {users}\\n"
+                f"💰 Total wallet balance: {wallet_total:.2f} ETB\\n"
+                f"💳 Pending deposits: {pending}\\n"
+                f"🎟 Tickets in current database: {tickets}"
+            )
+        elif action == "deposits":
+            rows = con.execute(
+                "SELECT id,user_id,method,created_at FROM deposit_requests WHERE status='pending' ORDER BY id DESC LIMIT 10"
+            ).fetchall()
+            if rows:
+                text_out = "💳 PENDING DEPOSITS\\n" + "\\n".join(
+                    f"#{x['id']} · User {x['user_id']} · {x['method']} · {x['created_at'][:16]}" for x in rows
+                )
+                text_out += "\\n\\nApprove: /approve_deposit ID AMOUNT_ETB\\nReject: /reject_deposit ID"
+            else:
+                text_out = "✅ No pending deposits."
+        elif action == "users":
+            rows = con.execute(
+                "SELECT user_id,balance_cents FROM wallets ORDER BY balance_cents DESC LIMIT 15"
+            ).fetchall()
+            text_out = "👥 USERS (top 15 by wallet balance)\\n" + (
+                "\\n".join(f"User {x['user_id']} · {x['balance_cents']/100:.2f} ETB" for x in rows)
+                if rows else "No wallet users yet."
+            )
+        elif action == "transactions":
+            rows = con.execute(
+                "SELECT user_id,kind,amount_cents,description,created_at FROM wallet_transactions ORDER BY id DESC LIMIT 10"
+            ).fetchall()
+            text_out = "📜 LAST 10 TRANSACTIONS\\n" + (
+                "\\n".join(f"{x['kind']} · User {x['user_id']} · {x['amount_cents']/100:.2f} ETB · {x['description']}" for x in rows)
+                if rows else "No transactions yet."
+            )
+        elif action == "game":
+            row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
+            if row:
+                count = con.execute("SELECT COUNT(*) FROM round_tickets WHERE round_id=?", (row["id"],)).fetchone()[0]
+                text_out = (
+                    f"🎮 ROUND #{row['id']}\\nStatus: {row['status']}\\n"
+                    f"Tickets: {count}\\nNumbers called: {len(json.loads(row['drawn_json']))}"
+                )
+                if row["status"] == "finished":
+                    text_out += f"\\nPrize pool: {(row['prize_cents'] or 0)/100:.2f} ETB"
+            else:
+                text_out = "No game round yet."
+        else:
+            text_out = "Unknown admin section."
+    keyboard = [[InlineKeyboardButton("⬅️ Admin menu", callback_data="admin:menu")]]
+    if action == "menu":
+        keyboard = [
+            [InlineKeyboardButton("📊 Overview", callback_data="admin:overview"),
+             InlineKeyboardButton("💳 Pending deposits", callback_data="admin:deposits")],
+            [InlineKeyboardButton("👥 Users", callback_data="admin:users"),
+             InlineKeyboardButton("📜 Transactions", callback_data="admin:transactions")],
+            [InlineKeyboardButton("🎮 Game status", callback_data="admin:game")]
+        ]
+        text_out = "🛠 BravoBingo ADMIN PANEL\\nChoose a section:"
+    await query.edit_message_text(text_out, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.exception("Telegram handler failed", exc_info=context.error)
 
@@ -713,6 +806,8 @@ def main():
 
     telegram_app = Application.builder().token(TOKEN).build()
     telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("admin", admin_panel))
+    telegram_app.add_handler(CallbackQueryHandler(admin_panel_action, pattern=r"^admin:"))
     telegram_app.add_handler(CommandHandler("approve_deposit", approve_deposit))
     telegram_app.add_handler(CommandHandler("reject_deposit", reject_deposit))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu))
