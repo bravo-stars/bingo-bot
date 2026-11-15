@@ -12,7 +12,7 @@ from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qsl
 
 from aiohttp import web
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 # ---------- LOGGING ----------
@@ -957,10 +957,14 @@ async def on_startup(webapp):
     application = webapp["telegram"]
     await application.initialize()
     await application.bot.set_my_commands([
-        ("start", "Open BravoBingo menu"), ("play", "Play Bingo"),
-        ("balance", "Check wallet balance"), ("deposit", "Deposit money"),
-        ("withdraw", "Withdraw money"), ("history", "Transaction history"),
-        ("instructions", "How to play"), ("register", "Register account")
+        BotCommand("start", "Open BravoBingo menu"),
+        BotCommand("play", "Play Bingo"),
+        BotCommand("balance", "Check wallet balance"),
+        BotCommand("deposit", "Deposit money"),
+        BotCommand("withdraw", "Withdraw money"),
+        BotCommand("history", "Transaction history"),
+        BotCommand("instructions", "How to play"),
+        BotCommand("register", "Register account")
     ])
 
     bot_info = await application.bot.get_me()
