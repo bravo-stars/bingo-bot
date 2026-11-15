@@ -72,7 +72,7 @@ const grid=document.getElementById('grid'),sold=document.getElementById('sold'),
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
 const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
 const headers={Authorization:'tma '+(tg?.initData||'')};
-let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false;
+let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false,lastGridSignature='';
 function updateSlots(){
   [1,2].forEach((i)=>{const el=document.getElementById('slot'+i),n=[...selected][i-1];el.classList.toggle('filled',!!n);el.innerHTML=n?'<div class="plus">🎟 '+n+'</div><div class="slotname">CARTELA '+n+'</div>':'<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';});
   confirmBtn.disabled=!game||game.status!=='open'||selected.size===0;
@@ -124,7 +124,9 @@ async function load(){
     selected=new Set([...d.mine,...localSelections]);
     cardsBox.innerHTML='';
     for(const [n,c] of Object.entries(d.cards||{}))showCard(n,c);
-    renderGame(d);render();
+    renderGame(d);
+    const signature=JSON.stringify([d.round_id,d.status,d.claimed,d.mine,[...localSelections].sort((a,b)=>a-b)]);
+    if(signature!==lastGridSignature){lastGridSignature=signature;render();}
     if(d.status!=='open')message.textContent=d.status==='drawing'?'Please wait for the called numbers.':'Round finished. The next round will open shortly.';
     else if(d.mine.length)message.textContent='Your Cartelas: '+d.mine.join(', ');
     else message.textContent='Select up to two free Cartelas.';
