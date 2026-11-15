@@ -429,6 +429,59 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.effective_message
+    awaiting_method = context.user_data.get("awaiting_deposit_sms")
+    if not awaiting_method:
+        return
+    if not message or not message.photo:
+        return
+    uid = update.effective_user.id
+    photo = message.photo[-1]
+    caption_text = (message.caption or "").strip()
+    proof_text = f"[PHOTO] file_unique_id={photo.file_unique_id}\nCaption: {caption_text}"
+    proof_hash = hashlib.sha256(f"{uid}:{photo.file_unique_id}".encode("utf-8")).hexdigest()
+    try:
+        with db() as con:
+            cur = con.execute(
+                """INSERT INTO deposit_requests
+                   (user_id,method,sms_text,sms_hash,created_at)
+                   VALUES(?,?,?,?,?)""",
+                (uid, awaiting_method, proof_text, proof_hash, datetime.now(timezone.utc).isoformat())
+            )
+            request_id = cur.lastrowid
+    except sqlite3.IntegrityError:
+        context.user_data.pop("awaiting_deposit_sms", None)
+        await message.reply_text("ይህ Screenshot ከዚህ በፊት ተልኳል። Admin እንዲያረጋግጥ ይጠብቁ።")
+        return
+
+    context.user_data.pop("awaiting_deposit_sms", None)
+    user = update.effective_user
+    admin_caption = (
+        f"💳 BravoBingo Deposit Request #{request_id}\n"
+        f"User ID: {uid}\n"
+        f"Name: {user.full_name}\n"
+        f"Username: @{user.username or 'none'}\n"
+        f"Method: {awaiting_method}\n"
+        f"Caption: {caption_text or 'None'}\n\n"
+        f"Approve: /approve_deposit {request_id} AMOUNT_ETB\n"
+        f"Reject: /reject_deposit {request_id}"
+    )
+    try:
+        await context.bot.send_photo(
+            chat_id=ADMIN_ID,
+            photo=photo.file_id,
+            caption=admin_caption[:1024]
+        )
+    except Exception:
+        logger.exception("Could not notify admin about screenshot deposit request %s", request_id)
+        await message.reply_text("Screenshot ተመዝግቧል፣ ግን Admin ማሳወቂያ አልተላከም። እባክዎ Admin ያነጋግሩ።")
+        return
+    await message.reply_text(
+        f"✅ የDeposit ጥያቄዎ #{request_id} ከScreenshot ጋር ተልኳል። Admin ካረጋገጠ በኋላ Wallet ይጨመራል።"
+    )
+
+
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     choice = (message.text or "").strip()
@@ -517,8 +570,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "ስልክ ቁጥር: 0945723383\n"
             "Account Name: Samuel Adino\n\n"
             "1. በላይ ባለው ቁጥር ክፍያ ይፈጽሙ።\n"
-            "2. ከክፍያው በኋላ የደረሰዎትን SMS ሙሉ በሙሉ Copy ያድርጉ።\n"
-            "3. SMS-ውን እዚህ ይላኩ።\n\n"
+            "2. ከክፍያው በኋላ Screenshot ይላኩ ወይም የደረሰዎትን SMS Copy/Paste ያድርጉ።\n"
+            "3. ከሁለቱ አንዱን ብቻ እዚህ ይላኩ።\n\n"
             "Admin ክፍያውን ካረጋገጠ በኋላ Wallet ይጨመራል።",
             reply_markup=ReplyKeyboardMarkup([["⬅️ Back"]], resize_keyboard=True)
         )
@@ -810,6 +863,7 @@ def main():
     telegram_app.add_handler(CallbackQueryHandler(admin_panel_action, pattern=r"^admin:"))
     telegram_app.add_handler(CommandHandler("approve_deposit", approve_deposit))
     telegram_app.add_handler(CommandHandler("reject_deposit", reject_deposit))
+    telegram_app.add_handler(MessageHandler(filters.PHOTO, deposit_photo))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu))
     telegram_app.add_error_handler(handle_error)
 
