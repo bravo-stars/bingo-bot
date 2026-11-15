@@ -40,7 +40,7 @@ MAIN_MENU = [
     ["📖 Instruction"],
     ["👤 Register"]
 ]
-ROOMS = [[KeyboardButton("🎮 Play | Free", web_app=WebAppInfo(url=BASE_URL + "/"))], ["🌟 Super Bingo | Free"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
+ROOMS = [[KeyboardButton("🎮 Play | VIP", web_app=WebAppInfo(url=BASE_URL + "/"))], ["🌟 Super Bingo | Free"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
 DEPOSIT_METHODS = [["📱 TELE-Birr"], ["🏦 CBE-Birr"], ["⬅️ Back"]]
 
 
@@ -487,9 +487,9 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎮 PLAY — Choose a room:",
             reply_markup=ReplyKeyboardMarkup(ROOMS, resize_keyboard=True)
         )
-    elif "play | free" in normalized or "play | 10" in normalized or "play demo" in normalized:
+    elif "play | free" in normalized or "play | vip" in normalized or "play | 10" in normalized or "play demo" in normalized:
         keys = [
-            [KeyboardButton("🎟 Open Cartela 1–700", web_app=WebAppInfo(url=BASE_URL + "/"))],
+            [KeyboardButton("🎟 Open VIP Cartela 1–600", web_app=WebAppInfo(url=BASE_URL + "/"))],
             ["⬅️ Back"]
         ]
         await message.reply_text(
