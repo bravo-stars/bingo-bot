@@ -101,6 +101,13 @@ def init_db():
         columns = {r["name"] for r in con.execute("PRAGMA table_info(game_rounds)")}
         if "winners_json" not in columns:
             con.execute("ALTER TABLE game_rounds ADD COLUMN winners_json TEXT NOT NULL DEFAULT '[]'")
+        round_columns = {r["name"] for r in con.execute("PRAGMA table_info(round_tickets)")}
+        if "user_name" not in round_columns:
+            con.execute("ALTER TABLE round_tickets ADD COLUMN user_name TEXT NOT NULL DEFAULT ''")
+        if "prize_cents" not in columns:
+            con.execute("ALTER TABLE game_rounds ADD COLUMN prize_cents INTEGER NOT NULL DEFAULT 0")
+        if "house_cents" not in columns:
+            con.execute("ALTER TABLE game_rounds ADD COLUMN house_cents INTEGER NOT NULL DEFAULT 0")
         con.execute("""CREATE TABLE IF NOT EXISTS wallet_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -154,6 +161,21 @@ def request_user(request):
     if not auth.startswith("tma "):
         raise web.HTTPUnauthorized(text="Open this page from Telegram.")
     return verify_init_data(auth[4:])
+
+
+def request_user_profile(request):
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("tma "):
+        raise web.HTTPUnauthorized(text="Open this page from Telegram.")
+    init_data = auth[4:]
+    uid = verify_init_data(init_data)
+    values = dict(parse_qsl(init_data, keep_blank_values=True))
+    try:
+        user = json.loads(values.get("user", "{}"))
+    except (ValueError, TypeError):
+        user = {}
+    name = " ".join(x for x in [user.get("first_name", ""), user.get("last_name", "")] if x).strip()
+    return uid, (name[:120] or f"Player {uid}")
 
 
 
@@ -226,23 +248,55 @@ async def game_loop():
                     if len(drawn) < 75:
                         drawn.append(order[len(drawn)])
                         tickets = con.execute(
-                            "SELECT ticket_no,user_id,card_json FROM round_tickets WHERE round_id=? ORDER BY ticket_no",
+                            "SELECT ticket_no,user_id,user_name,card_json FROM round_tickets WHERE round_id=? ORDER BY ticket_no",
                             (row["id"],)
                         ).fetchall()
                         winners = []
                         for ticket in tickets:
                             if has_winning_pattern(json.loads(ticket["card_json"]), drawn):
-                                winners.append({"ticket_no": ticket["ticket_no"], "user_id": ticket["user_id"]})
+                                winners.append({"ticket_no": ticket["ticket_no"], "user_id": ticket["user_id"],
+                                                "user_name": ticket["user_name"]})
                         if winners:
-                            # The round stops on this draw; everyone completing a pattern
-                            # with this same called number is recorded as a winner.
+                            # Pool is funded by paid Cartelas; reserve 20% for the house,
+                            # and divide the remaining 80% by winning Cartela.
+                            ticket_count = len(tickets)
+                            pool_cents = ticket_count * 1000
+                            house_cents = pool_cents // 5
+                            winner_pool = pool_cents - house_cents
+                            base_share, remainder = divmod(winner_pool, len(winners))
+                            for index, winner in enumerate(winners):
+                                share = base_share + (1 if index < remainder else 0)
+                                winner["prize_cents"] = share
+                                con.execute(
+                                    "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) "
+                                    "ON CONFLICT(user_id) DO UPDATE SET balance_cents=balance_cents+excluded.balance_cents",
+                                    (winner["user_id"], share)
+                                )
+                                if share:
+                                    con.execute(
+                                        "INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)",
+                                        (winner["user_id"], "WIN", share,
+                                         f"Round {row['id']} Cartela {winner['ticket_no']} prize",
+                                         datetime.now(timezone.utc).isoformat())
+                                    )
+                            con.execute(
+                                "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) "
+                                "ON CONFLICT(user_id) DO UPDATE SET balance_cents=balance_cents+excluded.balance_cents",
+                                (ADMIN_ID, house_cents)
+                            )
+                            if house_cents:
+                                con.execute(
+                                    "INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)",
+                                    (ADMIN_ID, "HOUSE", house_cents, f"Round {row['id']} 20% house share",
+                                     datetime.now(timezone.utc).isoformat())
+                                )
                             first = winners[0]
                             con.execute(
                                 """UPDATE game_rounds SET drawn_json=?,status='finished',
-                                   winner_ticket=?,winner_user_id=?,winners_json=?,finished_at=?,
-                                   next_draw_at=NULL WHERE id=?""",
+                                   winner_ticket=?,winner_user_id=?,winners_json=?,prize_cents=?,
+                                   house_cents=?,finished_at=?,next_draw_at=NULL WHERE id=?""",
                                 (json.dumps(drawn), first["ticket_no"], first["user_id"],
-                                 json.dumps(winners), now, row["id"])
+                                 json.dumps(winners), winner_pool, house_cents, now, row["id"])
                             )
                         elif len(drawn) >= 75:
                             con.execute(
@@ -278,6 +332,7 @@ async def ticket_status(request):
     uid = request_user(request)
     round_info = ensure_round()
     with db() as con:
+        full_round = con.execute("SELECT * FROM game_rounds WHERE id=?", (round_info["id"],)).fetchone()
         claimed = [r["ticket_no"] for r in con.execute(
             "SELECT ticket_no FROM round_tickets WHERE round_id=? ORDER BY ticket_no", (round_info["id"],)
         )]
@@ -299,6 +354,8 @@ async def ticket_status(request):
         "winner_ticket": round_info["winner_ticket"],
         "winner_user_id": round_info["winner_user_id"],
         "winners": json.loads(round_info["winners_json"] or "[]"),
+        "prize_etb": (full_round["prize_cents"] or 0) / 100,
+        "house_etb": (full_round["house_cents"] or 0) / 100,
         "claimed": claimed,
         "mine": mine,
         "balance_etb": balance_etb,
@@ -307,7 +364,7 @@ async def ticket_status(request):
 
 
 async def select_tickets(request):
-    uid = request_user(request)
+    uid, user_name = request_user_profile(request)
     body = await request.json()
     nums = body.get("tickets")
     if not isinstance(nums, list) or not 1 <= len(nums) <= 2:
@@ -329,11 +386,23 @@ async def select_tickets(request):
         add = [n for n in nums if n not in existing]
         if len(existing) + len(add) > 2:
             raise web.HTTPBadRequest(text="You can own at most two Cartelas in one round.")
+        cost_cents = len(add) * 1000
+        wallet = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
+        balance_cents = wallet["balance_cents"] if wallet else 0
+        if balance_cents < cost_cents:
+            raise web.HTTPPaymentRequired(text=f"Insufficient balance. Each Cartela costs 10 ETB; need {cost_cents/100:.2f} ETB.")
+        if cost_cents:
+            con.execute("UPDATE wallets SET balance_cents=balance_cents-? WHERE user_id=?", (cost_cents, uid))
+            con.execute(
+                "INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)",
+                (uid, "TICKET", -cost_cents, f"Round {round_id}: {len(add)} Cartela(s)",
+                 datetime.now(timezone.utc).isoformat())
+            )
         for n in add:
             try:
                 con.execute(
-                    "INSERT INTO round_tickets(round_id,ticket_no,user_id,card_json,created_at) VALUES(?,?,?,?,?)",
-                    (round_id, n, uid, json.dumps(make_card()), datetime.now(timezone.utc).isoformat())
+                    "INSERT INTO round_tickets(round_id,ticket_no,user_id,card_json,created_at,user_name) VALUES(?,?,?,?,?,?)",
+                    (round_id, n, uid, json.dumps(make_card()), datetime.now(timezone.utc).isoformat(), user_name)
                 )
             except sqlite3.IntegrityError:
                 raise web.HTTPConflict(text=f"Cartela {n} is already taken. Refresh and choose another.")
