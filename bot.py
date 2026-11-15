@@ -615,7 +615,8 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             request_id = cur.lastrowid
     except sqlite3.IntegrityError:
-        context.user_data.pop("awaiting_deposit_sms", None)
+        for key in ("awaiting_deposit_sms", "deposit_requested_amount_cents", "deposit_method"):
+            context.user_data.pop(key, None)
         await message.reply_text("ይህ Screenshot ከዚህ በፊት ተልኳል። Admin እንዲያረጋግጥ ይጠብቁ።")
         return
 
@@ -711,7 +712,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 request_id = cur.lastrowid
         except sqlite3.IntegrityError:
-            context.user_data.pop("awaiting_deposit_sms", None)
+            for key in ("awaiting_deposit_sms", "deposit_requested_amount_cents", "deposit_method"):
+                context.user_data.pop(key, None)
             await message.reply_text("ይህ SMS ከዚህ በፊት ተልኳል። Admin እንዲያረጋግጥ ይጠብቁ።")
             return
         context.user_data.pop("awaiting_deposit_sms", None)
@@ -836,7 +838,7 @@ async def approve_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         request_id = int(context.args[0])
         amount = Decimal(context.args[1])
-        if not amount.is_finite() or amount <= 0:
+        if not amount.is_finite() or amount < Decimal("10"):
             raise InvalidOperation()
         cents_decimal = amount * 100
         if cents_decimal != cents_decimal.to_integral_value():
