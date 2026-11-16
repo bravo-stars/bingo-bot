@@ -20,7 +20,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#e5ebf3;color:var(--ink);
 .room strong{font-size:15px;white-space:nowrap;line-height:1.1}
 .balance{background:#16a34a}
 .balance small{color:#e2fbe9}
-.balance strong{font-size:16px}
+.balance strong{font-size:16px}.balance #addFunds{margin-top:5px;border:0;border-radius:8px;padding:4px 8px;background:#fff;color:#15803d;font-size:10px;font-weight:900;cursor:pointer}
 #gamePanel{padding:4px 14px 10px;background:#e5ebf3;text-align:center}
 #gameStatus{font-size:13px;font-weight:800;margin:2px 0 7px;color:#253247}
 #calledNumbers{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-height:54px;overflow:auto}
@@ -58,7 +58,7 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
     <div class="stat room"><small>ROOM</small><strong>VIP 💰💰</strong></div>
     <div class="stat"><small>SOLD</small><strong id="sold">0</strong></div>
     <div class="stat"><small>TIME</small><strong id="timer">30s</strong></div>
-    <div class="stat balance"><small>BALANCE</small><strong id="balance">0.00 ETB</strong></div>
+    <div class="stat balance"><small>BALANCE</small><strong id="balance">0.00 ETB</strong><button id="addFunds" type="button">＋ ADD MONEY</button></div>
   </header>
   <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="currentNumber" class="empty">WAIT</div><div id="winnerDetails"></div><div id="calledNumbers"></div><div class="hint">VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins</div></section>
   <main id="boardWrap"><div id="grid"></div></main>
@@ -72,6 +72,7 @@ td,th{border:1px solid #cbd5e1;padding:4px 2px}
 </div>
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
+document.getElementById('addFunds').onclick=()=>{if(tg?.openTelegramLink)tg.openTelegramLink('https://t.me/bravobingo1bot?start=deposit');else location.href='https://t.me/bravobingo1bot?start=deposit';};
 const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer'),balance=document.getElementById('balance');
 const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
 const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
