@@ -44,6 +44,8 @@ MAIN_MENU = [
 ]
 ROOMS = [[KeyboardButton("🎮 Play | VIP", web_app=WebAppInfo(url=BASE_URL + "/"))], ["🌟 Super Bingo | Free"], ["🎁 BravoBingo Bonus"], ["⬅️ Back"]]
 DEPOSIT_METHODS = [["📱 TELE-Birr"], ["🏦 CBE-Birr"], ["⬅️ Back"]]
+DEPOSIT_AMOUNTS = [["50 ETB", "100 ETB"], ["200 ETB", "500 ETB"], ["1000 ETB"], ["⬅️ Back"]]
+ALLOWED_DEPOSIT_AMOUNTS = {50, 100, 200, 500, 1000}
 
 
 # ---------- DATABASE ----------
@@ -780,15 +782,15 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if context.user_data.get("deposit_step") == "amount" and choice:
         try:
-            amount_text = re.sub(r"(?i)\\s*(ETB|birr|ብር)\\s*$", "", choice.strip())
+            amount_text = re.sub(r"(?i)\s*(ETB|birr|ብር)\s*$", "", choice.strip())
             amount_text = amount_text.replace(",", "").replace(" ", "")
             amount = Decimal(amount_text)
             cents = amount * 100
-            if not amount.is_finite() or amount < Decimal("10") or cents != cents.to_integral_value():
+            if not amount.is_finite() or cents != cents.to_integral_value() or amount not in {Decimal(x) for x in ALLOWED_DEPOSIT_AMOUNTS}:
                 raise InvalidOperation()
             requested_cents = int(cents)
         except (InvalidOperation, ValueError):
-            await message.reply_text("❌ ቢያንስ 10 ETB ያስገቡ። ቁጥር ብቻ ይጻፉ፤ ለምሳሌ: 50 ወይም 50 ETB")
+            await message.reply_text("❌ ከታች ካሉት የDeposit መጠኖች አንዱን ይምረጡ።", reply_markup=ReplyKeyboardMarkup(DEPOSIT_AMOUNTS, resize_keyboard=True))
             return
         context.user_data["deposit_requested_amount_cents"] = requested_cents
         context.user_data.pop("deposit_step", None)
@@ -920,7 +922,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(
             f"💳 {method}\n"
             "የሚያስገቡትን ብር መጠን ያስገቡ።\n"
-            "Minimum Deposit: 10 ETB"
+            "የDeposit መጠን ከታች ይምረጡ።",
+            reply_markup=ReplyKeyboardMarkup(DEPOSIT_AMOUNTS, resize_keyboard=True)
         )
     elif "back" in normalized or normalized == "⬅":
         await start(update, context)
