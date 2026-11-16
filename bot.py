@@ -526,10 +526,13 @@ async def instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    registered_at = datetime.now(timezone.utc).isoformat()
     with db() as con:
         con.execute("INSERT INTO bot_users(user_id,full_name,username,registered_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET full_name=excluded.full_name, username=excluded.username",
-                    (user.id, user.full_name[:200], user.username, datetime.now(timezone.utc).isoformat()))
-    await update.effective_message.reply_text("✅ BravoBingo account registered. Your Telegram account is linked.")
+                    (user.id, user.full_name[:200], user.username, registered_at))
+        con.execute("INSERT INTO wallets(user_id,balance_cents) VALUES(?,0) ON CONFLICT(user_id) DO NOTHING",
+                    (user.id,))
+    await update.effective_message.reply_text("✅ BravoBingo account registered. Your Telegram account is linked and Wallet is ready.")
 
 
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -585,7 +588,15 @@ async def reject_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for key in ("awaiting_deposit_sms", "deposit_step", "deposit_method", "deposit_requested_amount_cents"):
         context.user_data.pop(key, None)
-    logger.info("/start received from Telegram user %s", update.effective_user.id if update.effective_user else "unknown")
+    user = update.effective_user
+    if user:
+        registered_at = datetime.now(timezone.utc).isoformat()
+        with db() as con:
+            con.execute("INSERT INTO bot_users(user_id,full_name,username,registered_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET full_name=excluded.full_name, username=excluded.username",
+                        (user.id, user.full_name[:200], user.username, registered_at))
+            con.execute("INSERT INTO wallets(user_id,balance_cents) VALUES(?,0) ON CONFLICT(user_id) DO NOTHING",
+                        (user.id,))
+    logger.info("/start received from Telegram user %s", user.id if user else "unknown")
     await update.effective_message.reply_text(
         "🎉 Welcome to BravoBingo!\nChoose an option:",
         reply_markup=ReplyKeyboardMarkup(MAIN_MENU, resize_keyboard=True)
