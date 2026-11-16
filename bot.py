@@ -1156,6 +1156,12 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ---------- TELEGRAM WEBHOOK ----------
+# Telegram may retry the same webhook update. Ignore duplicate update IDs.
+_processed_update_ids = set()
+_processed_update_order = []
+_MAX_PROCESSED_UPDATES = 5000
+
+
 async def telegram_webhook(request):
     received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if not hmac.compare_digest(received_secret, WEBHOOK_SECRET):
@@ -1165,7 +1171,16 @@ async def telegram_webhook(request):
     try:
         data = await request.json()
         update = Update.de_json(data, request.app["telegram"].bot)
-        logger.info("Webhook update received: update_id=%s", update.update_id)
+        update_id = update.update_id
+        if update_id in _processed_update_ids:
+            logger.warning("Ignoring duplicate Telegram update: update_id=%s", update_id)
+            return web.Response(text="ok")
+        _processed_update_ids.add(update_id)
+        _processed_update_order.append(update_id)
+        if len(_processed_update_order) > _MAX_PROCESSED_UPDATES:
+            expired_id = _processed_update_order.pop(0)
+            _processed_update_ids.discard(expired_id)
+        logger.info("Webhook update received: update_id=%s", update_id)
         await request.app["telegram"].update_queue.put(update)
         return web.Response(text="ok")
     except Exception:
