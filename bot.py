@@ -677,7 +677,7 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                    (user_id,method,sms_text,sms_hash,requested_amount_cents,created_at)
                    VALUES(?,?,?,?,?,?) RETURNING id""",
                 (uid, awaiting_method, proof_text, proof_hash,
-                 context.user_data.get("deposit_requested_amount_cents"), datetime.now(timezone.utc).isoformat())
+                 requested_cents, datetime.now(timezone.utc).isoformat())
             )
             request_id = cur.fetchone()["id"]
     except psycopg2.IntegrityError:
@@ -784,6 +784,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if awaiting_method and normalized not in menu_labels and choice:
         uid = update.effective_user.id
+        requested_cents = context.user_data.get("deposit_requested_amount_cents")
         sms_text = choice[:3500]
         extracted_cents = extract_deposit_amount(sms_text)
         sms_hash = hashlib.sha256(sms_text.strip().encode("utf-8")).hexdigest()
