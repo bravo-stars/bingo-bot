@@ -780,13 +780,15 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if context.user_data.get("deposit_step") == "amount" and choice:
         try:
-            amount = Decimal(choice.replace(",", "").strip())
+            amount_text = re.sub(r"(?i)\\s*(ETB|birr|ብር)\\s*$", "", choice.strip())
+            amount_text = amount_text.replace(",", "").replace(" ", "")
+            amount = Decimal(amount_text)
             cents = amount * 100
             if not amount.is_finite() or amount < Decimal("10") or cents != cents.to_integral_value():
                 raise InvalidOperation()
             requested_cents = int(cents)
         except (InvalidOperation, ValueError):
-            await message.reply_text("❌ ቢያንስ 10 ETB ያስገቡ። ለምሳሌ: 50")
+            await message.reply_text("❌ ቢያንስ 10 ETB ያስገቡ። ቁጥር ብቻ ይጻፉ፤ ለምሳሌ: 50 ወይም 50 ETB")
             return
         context.user_data["deposit_requested_amount_cents"] = requested_cents
         context.user_data.pop("deposit_step", None)
