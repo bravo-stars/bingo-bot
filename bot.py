@@ -614,6 +614,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
+    choice = (message.text or "").strip() if message else ""
     withdrawal_step = context.user_data.get("withdrawal_step")
     if withdrawal_step == "amount":
         try:
@@ -648,7 +649,7 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=f'🏧 WITHDRAWAL #{rid}\\nUser: {uid}\\nMethod: {method}\\nAmount: {amount_cents/100:.2f} ETB\\nAccount: {details}\\nApprove after payment: /approve_withdrawal {rid}\\nReject/refund: /reject_withdrawal {rid}')
         await message.reply_text(f'✅ Withdrawal #{rid} ተመዝግቧል። {amount_cents/100:.2f} ETB ከWallet ተይዟል።'); return
 
-    if not message or not message.photo or not update.effective_user:
+    if not message or not (message.photo or (message.document and (message.document.mime_type or "").startswith("image/"))) or not update.effective_user:
         return
     uid = update.effective_user.id
     awaiting_method = context.user_data.get("awaiting_deposit_sms")
@@ -666,10 +667,11 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await message.reply_text("📌 የDeposit ጥያቄ ለመላክ መጀመሪያ /deposit ይጫኑ፣ TELE-Birr ይምረጡ እና የብር መጠኑን ያስገቡ።")
             return
-    photo = message.photo[-1]
+    proof_file = message.photo[-1] if message.photo else message.document
     caption_text = (message.caption or "").strip()
-    proof_text = f"[PHOTO] file_unique_id={photo.file_unique_id}\nCaption: {caption_text}"
-    proof_hash = hashlib.sha256(f"{uid}:{photo.file_unique_id}".encode("utf-8")).hexdigest()
+    proof_kind = "PHOTO" if message.photo else "IMAGE_DOCUMENT"
+    proof_text = f"[{proof_kind}] file_unique_id={proof_file.file_unique_id}\nCaption: {caption_text}"
+    proof_hash = hashlib.sha256(f"{uid}:{proof_file.file_unique_id}".encode("utf-8")).hexdigest()
     try:
         with db() as con:
             cur = con.execute(
@@ -684,6 +686,10 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for key in ("awaiting_deposit_sms", "deposit_requested_amount_cents", "deposit_method"):
             context.user_data.pop(key, None)
         await message.reply_text("ይህ Screenshot ከዚህ በፊት ተልኳል። Admin እንዲያረጋግጥ ይጠብቁ።")
+        return
+    except Exception:
+        logger.exception("Could not save screenshot deposit request for user %s", uid)
+        await message.reply_text("❌ Screenshot ማስመዝገብ አልተሳካም። እባክዎ አሁን ደግመው አይላኩ፤ Admin ያነጋግሩ።")
         return
 
     context.user_data.pop("awaiting_deposit_sms", None)
@@ -704,11 +710,18 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Reject: /reject_deposit {request_id}"
     )
     try:
-        await context.bot.send_photo(
-            chat_id=ADMIN_ID,
-            photo=photo.file_id,
-            caption=admin_caption[:1024]
-        )
+        if message.photo:
+            await context.bot.send_photo(
+                chat_id=ADMIN_ID,
+                photo=proof_file.file_id,
+                caption=admin_caption[:1024]
+            )
+        else:
+            await context.bot.send_document(
+                chat_id=ADMIN_ID,
+                document=proof_file.file_id,
+                caption=admin_caption[:1024]
+            )
     except Exception:
         logger.exception("Could not notify admin about screenshot deposit request %s", request_id)
         await message.reply_text("Screenshot ተመዝግቧል፣ ግን Admin ማሳወቂያ አልተላከም። እባክዎ Admin ያነጋግሩ።")
@@ -1195,7 +1208,7 @@ def main():
     telegram_app.add_handler(CommandHandler("reject_deposit", reject_deposit))
     telegram_app.add_handler(CommandHandler("approve_withdrawal", approve_withdrawal))
     telegram_app.add_handler(CommandHandler("reject_withdrawal", reject_withdrawal))
-    telegram_app.add_handler(MessageHandler(filters.PHOTO, deposit_photo))
+    telegram_app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, deposit_photo))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu))
     telegram_app.add_error_handler(handle_error)
 
