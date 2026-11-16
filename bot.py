@@ -597,6 +597,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             con.execute("INSERT INTO wallets(user_id,balance_cents) VALUES(?,0) ON CONFLICT(user_id) DO NOTHING",
                         (user.id,))
     logger.info("/start received from Telegram user %s", user.id if user else "unknown")
+    if context.args and context.args[0].lower() == "deposit":
+        await deposit(update, context)
+        return
     await update.effective_message.reply_text(
         "🎉 Welcome to BravoBingo!\nChoose an option:",
         reply_markup=ReplyKeyboardMarkup(MAIN_MENU, resize_keyboard=True)
