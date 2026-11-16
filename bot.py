@@ -956,12 +956,22 @@ async def approve_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user or update.effective_user.id != ADMIN_ID:
         await update.effective_message.reply_text("Not authorized.")
         return
-    if len(context.args) != 2:
-        await update.effective_message.reply_text("Usage: /approve_deposit REQUEST_ID AMOUNT_ETB")
+    # Read arguments from Telegram's parsed command args, with a text fallback
+    # for clients/messages where context.args is unexpectedly empty.
+    args = list(context.args or [])
+    if len(args) < 2 and update.effective_message and update.effective_message.text:
+        parts = update.effective_message.text.strip().split()
+        if parts:
+            args = parts[1:]
+    if len(args) < 2:
+        await update.effective_message.reply_text(
+            "❗ ትክክለኛ አጠቃቀም:\\n/approve_deposit 2 200\\n"
+            "የመጀመሪያው ቁጥር Request ID ነው፤ ሁለተኛው የተቀበልከው ብር መጠን ነው።"
+        )
         return
     try:
-        request_id = int(context.args[0])
-        amount = Decimal(context.args[1])
+        request_id = int(args[0])
+        amount = Decimal(args[1])
         if not amount.is_finite() or amount < Decimal("10"):
             raise InvalidOperation()
         cents_decimal = amount * 100
