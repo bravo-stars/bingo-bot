@@ -514,12 +514,22 @@ def extract_deposit_amount(sms_text):
 
 # ---------- TELEGRAM BOT HANDLERS ----------
 
-async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_balance_once(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Ignore repeated balance-button taps/commands within 3 seconds.
+    now = time.monotonic()
+    last = context.user_data.get("last_balance_reply_at", 0)
+    if now - last < 3:
+        return
+    context.user_data["last_balance_reply_at"] = now
     uid = update.effective_user.id
     with db() as con:
         row = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
     balance = (row["balance_cents"] if row else 0) / 100
     await update.effective_message.reply_text(f"💰 Your BravoBingo balance: {balance:.2f} ETB")
+
+
+async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_balance_once(update, context)
 
 
 async def play(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -926,10 +936,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
     else:
         if choice == "💰 Check your balance":
-            with db() as con:
-                row = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (update.effective_user.id,)).fetchone()
-            balance = (row["balance_cents"] if row else 0) / 100
-            await message.reply_text(f"💰 Your BravoBingo balance: {balance:.2f} ETB")
+            await send_balance_once(update, context)
             return
         if choice == "📜 Transaction History":
             with db() as con:
