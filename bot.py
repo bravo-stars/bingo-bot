@@ -105,6 +105,12 @@ def init_db():
             created_at TEXT NOT NULL,
             reviewed_at TEXT
         )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS deposit_sessions (
+            user_id BIGINT PRIMARY KEY,
+            method TEXT NOT NULL,
+            requested_amount_cents INTEGER,
+            updated_at TEXT NOT NULL
+        )""")
         deposit_columns = {r["name"] for r in con.execute("SELECT column_name AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=%s", ("deposit_requests",))}
         if "requested_amount_cents" not in deposit_columns:
             con.execute("ALTER TABLE deposit_requests ADD COLUMN requested_amount_cents INTEGER")
@@ -642,12 +648,24 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=f'🏧 WITHDRAWAL #{rid}\\nUser: {uid}\\nMethod: {method}\\nAmount: {amount_cents/100:.2f} ETB\\nAccount: {details}\\nApprove after payment: /approve_withdrawal {rid}\\nReject/refund: /reject_withdrawal {rid}')
         await message.reply_text(f'✅ Withdrawal #{rid} ተመዝግቧል። {amount_cents/100:.2f} ETB ከWallet ተይዟል።'); return
 
-    awaiting_method = context.user_data.get("awaiting_deposit_sms")
-    if not awaiting_method:
-        return
-    if not message or not message.photo:
+    if not message or not message.photo or not update.effective_user:
         return
     uid = update.effective_user.id
+    awaiting_method = context.user_data.get("awaiting_deposit_sms")
+    requested_cents = context.user_data.get("deposit_requested_amount_cents")
+    if not awaiting_method:
+        # Recover the deposit flow after a bot restart or lost in-memory user state.
+        with db() as con:
+            session = con.execute(
+                "SELECT method,requested_amount_cents FROM deposit_sessions WHERE user_id=?",
+                (uid,)
+            ).fetchone()
+        if session:
+            awaiting_method = session["method"]
+            requested_cents = session["requested_amount_cents"]
+        else:
+            await message.reply_text("📌 የDeposit ጥያቄ ለመላክ መጀመሪያ /deposit ይጫኑ፣ TELE-Birr ይምረጡ እና የብር መጠኑን ያስገቡ።")
+            return
     photo = message.photo[-1]
     caption_text = (message.caption or "").strip()
     proof_text = f"[PHOTO] file_unique_id={photo.file_unique_id}\nCaption: {caption_text}"
@@ -669,9 +687,11 @@ async def deposit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     context.user_data.pop("awaiting_deposit_sms", None)
-    user = update.effective_user
-    requested_cents = context.user_data.pop("deposit_requested_amount_cents", None)
+    context.user_data.pop("deposit_requested_amount_cents", None)
     context.user_data.pop("deposit_method", None)
+    with db() as con:
+        con.execute("DELETE FROM deposit_sessions WHERE user_id=?", (uid,))
+    user = update.effective_user
     admin_caption = (
         f"💳 BravoBingo Deposit Request #{request_id}\n"
         f"User ID: {uid}\n"
@@ -705,6 +725,16 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Menu message received: %r (normalized=%r)", choice, normalized)
 
     awaiting_method = context.user_data.get("awaiting_deposit_sms")
+    if not awaiting_method and update.effective_user:
+        with db() as con:
+            saved_session = con.execute(
+                "SELECT method,requested_amount_cents FROM deposit_sessions WHERE user_id=?",
+                (update.effective_user.id,)
+            ).fetchone()
+        if saved_session:
+            awaiting_method = saved_session["method"]
+            context.user_data["deposit_requested_amount_cents"] = saved_session["requested_amount_cents"]
+            context.user_data["awaiting_deposit_sms"] = awaiting_method
     menu_labels = {
         "🎮 play", "play", "🎮", "play game", "💰 check your balance",
         "💳 deposit", "deposit", "🏧 withdrawal", "📜 transaction history",
@@ -731,6 +761,14 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("deposit_step", None)
         method = context.user_data.get("deposit_method")
         context.user_data["awaiting_deposit_sms"] = method
+        with db() as con:
+            con.execute(
+                """INSERT INTO deposit_sessions(user_id,method,requested_amount_cents,updated_at)
+                   VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET
+                   method=excluded.method,requested_amount_cents=excluded.requested_amount_cents,
+                   updated_at=excluded.updated_at""",
+                (update.effective_user.id, method, requested_cents, datetime.now(timezone.utc).isoformat())
+            )
         await message.reply_text(
             f"💳 {method}\n"
             f"የሚከፍሉት መጠን: {requested_cents/100:.2f} ETB\n"
@@ -756,7 +794,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                        (user_id,method,sms_text,sms_hash,amount_cents,requested_amount_cents,created_at)
                        VALUES(?,?,?,?,?,?,?) RETURNING id""",
                     (uid, awaiting_method, sms_text, sms_hash, extracted_cents,
-                     context.user_data.get("deposit_requested_amount_cents"), datetime.now(timezone.utc).isoformat())
+                     requested_cents, datetime.now(timezone.utc).isoformat())
                 )
                 request_id = cur.fetchone()["id"]
         except psycopg2.IntegrityError:
@@ -767,6 +805,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("awaiting_deposit_sms", None)
         user = update.effective_user
         requested_cents = context.user_data.pop("deposit_requested_amount_cents", None)
+        with db() as con:
+            con.execute("DELETE FROM deposit_sessions WHERE user_id=?", (uid,))
         context.user_data.pop("deposit_method", None)
         admin_text = (
             f"💳 BravoBingo Deposit Request #{request_id}\n"
@@ -841,6 +881,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["deposit_step"] = "amount"
         context.user_data.pop("awaiting_deposit_sms", None)
         context.user_data.pop("deposit_requested_amount_cents", None)
+        with db() as con:
+            con.execute("DELETE FROM deposit_sessions WHERE user_id=?", (update.effective_user.id,))
         await message.reply_text(
             f"💳 {method}\n"
             "የሚያስገቡትን ብር መጠን ያስገቡ።\n"
