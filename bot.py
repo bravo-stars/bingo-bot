@@ -468,10 +468,10 @@ async def ticket_status(request):
 
     return web.json_response({
         "round_id": round_info["id"],
-        "status": round_info["status"],
-        "closes_at": round_info["closes_at"],
-        "next_draw_at": round_info["next_draw_at"],
-        "drawn": json.loads(round_info["drawn_json"]),
+        "status": full_round["status"],
+        "closes_at": full_round["closes_at"],
+        "next_draw_at": full_round["next_draw_at"],
+        "drawn": json.loads(full_round["drawn_json"]),
         "winner_ticket": round_info["winner_ticket"],
         "winner_user_id": round_info["winner_user_id"],
         "winners": json.loads(full_round["winners_json"] or "[]"),
