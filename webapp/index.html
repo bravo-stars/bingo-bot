@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -178,7 +179,7 @@ body{
 }
 .ticket:disabled{cursor:not-allowed;opacity:1}
 
-/* PUBLIC CARTELA CARDS */
+/* PRIVATE CARTELA CARDS */
 #cards{
   background:#fff;
   padding:8px 14px;
@@ -352,7 +353,7 @@ body{
   </main>
 
   <div id="cards">
-    <div class="empty-cards">Waiting for Cartelas...</div>
+    <div class="empty-cards">Your Cartelas will appear here after purchase.</div>
   </div>
 
   <section id="bottom">
@@ -374,6 +375,7 @@ body{
 
 <script>
 const tg=window.Telegram?.WebApp;
+
 tg?.ready();
 tg?.expand();
 
@@ -394,13 +396,14 @@ const winnerDetails=document.getElementById('winnerDetails');
 document.getElementById('gamePanel').style.display='none';
 
 const authHeaders=()=>({
-  Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')
+  Authorization:'tma '+(tg?.initData||'')
 });
 
 let selected=new Set();
 let localSelections=new Set();
 let claimed=new Set();
 let mineTickets=new Set();
+
 let game=null;
 let lastRound=null;
 let loading=false;
@@ -413,12 +416,13 @@ function tickTimer(){
       0,
       Math.ceil(timerTarget-Date.now()/1000)
     );
+
     timer.textContent=left+'s';
   }
 }
 
 function updateSlots(){
-  const chosen=[...selected];
+  const chosen=[...selected].sort((a,b)=>a-b);
 
   [1,2].forEach((i)=>{
     const el=document.getElementById('slot'+i);
@@ -449,6 +453,7 @@ function render(){
 
     const isTaken=claimed.has(n);
     const isMine=mineTickets.has(n);
+    const isSelected=localSelections.has(n);
 
     b.textContent=isMine
       ? n+' ✓'
@@ -459,9 +464,13 @@ function render(){
     b.className='ticket'
       +(isTaken?' taken':'')
       +(isMine?' owned':'')
-      +(localSelections.has(n)?' selected':'');
+      +(isSelected?' selected':'');
 
-    b.disabled=isTaken||!game||game.status!=='open';
+    b.disabled=(
+      isTaken ||
+      !game ||
+      game.status!=='open'
+    );
 
     b.onclick=()=>{
       if(mineTickets.has(n)){
@@ -469,15 +478,19 @@ function render(){
         return;
       }
 
-      if(selected.has(n)){
-        selected.delete(n);
+      if(localSelections.has(n)){
         localSelections.delete(n);
-      }else if(selected.size<2){
-        selected.add(n);
-        localSelections.add(n);
+        selected.delete(n);
       }else{
-        message.textContent='Maximum two Cartelas.';
-        return;
+        // Maximum two Cartelas in total,
+        // including already purchased Cartelas.
+        if(mineTickets.size+localSelections.size>=2){
+          message.textContent='Maximum two Cartelas per round.';
+          return;
+        }
+
+        localSelections.add(n);
+        selected.add(n);
       }
 
       message.textContent='';
@@ -488,29 +501,26 @@ function render(){
   }
 
   sold.textContent=claimed.size;
+
   updateSlots();
 }
 
-/* Display one complete Cartela */
-function showCard(no,rows,drawn,owner,isMine){
+/* Display one Cartela belonging to this user */
+function showCard(no,rows,drawn){
   const called=new Set(
     (drawn||[]).map(Number)
   );
 
   const box=document.createElement('div');
-  box.className='card'+(isMine?' mine':'');
+  box.className='card mine';
 
   const h=document.createElement('h3');
-  h.textContent='🎟 Cartela #'+no+(isMine?' · YOU':'');
+  h.textContent='🎟 Cartela #'+no+' · YOU';
   box.appendChild(h);
 
   const who=document.createElement('div');
   who.className='card-owner';
-
-  who.textContent=isMine
-    ? '👤 Your Cartela'
-    : '👤 '+(owner||'Player');
-
+  who.textContent='👤 Your Cartela';
   box.appendChild(who);
 
   const t=document.createElement('table');
@@ -545,38 +555,29 @@ function showCard(no,rows,drawn,owner,isMine){
   cardsBox.appendChild(box);
 }
 
-function renderPublicCards(d){
+/* IMPORTANT:
+   Only d.cards is displayed.
+   Never display public_cards or other players' cards.
+*/
+function renderMyCards(d){
   cardsBox.innerHTML='';
 
-  const publicCards=d.public_cards||{};
-  const entries=Object.entries(publicCards);
+  const myCards=d.cards||{};
+  const entries=Object.entries(myCards);
 
   if(entries.length){
     entries.sort((a,b)=>Number(a[0])-Number(b[0]));
 
-    for(const [n,info] of entries){
+    for(const [n,rows] of entries){
       showCard(
         n,
-        info.grid,
-        d.drawn||[],
-        info.user_name,
-        Boolean(info.is_mine)
+        rows,
+        d.drawn||[]
       );
     }
-    return;
-  }
-
-  /* Fallback for older backend response */
-  const myCards=d.cards||{};
-  const myEntries=Object.entries(myCards);
-
-  for(const [n,rows] of myEntries){
-    showCard(n,rows,d.drawn||[],'',true);
-  }
-
-  if(!myEntries.length){
+  }else{
     cardsBox.innerHTML=
-      '<div class="empty-cards">No Cartelas have been selected yet.</div>';
+      '<div class="empty-cards">Your Cartelas will appear here after purchase.</div>';
   }
 }
 
@@ -618,7 +619,7 @@ function renderGame(d){
 
     const left=Math.max(
       0,
-      Math.ceil((d.next_draw_at||now)-now)
+      Math.ceil(Number(d.next_draw_at||now)-now)
     );
 
     timer.textContent=left+'s';
@@ -686,7 +687,9 @@ async function load(){
     }
 
     const r=await fetch('/api/tickets',{
-      headers:authHeaders()
+      method:'GET',
+      headers:authHeaders(),
+      cache:'no-store'
     });
 
     if(!r.ok){
@@ -715,35 +718,37 @@ async function load(){
     balance.textContent=
       Number(d.balance_etb||0).toFixed(2)+' ETB';
 
-    /* Remove local selections that another player bought */
+    // Remove selections bought by another player.
     localSelections=new Set(
       [...localSelections].filter(
         n=>!claimed.has(n)||mineTickets.has(n)
       )
     );
 
-    /* Existing purchases plus new local selections */
+    // Keep owned tickets and local selections.
     selected=new Set([
       ...mineTickets,
       ...localSelections
     ]);
 
-    /* Show every player's complete Cartela */
-    renderPublicCards(d);
+    // Display only this user's Cartelas.
+    renderMyCards(d);
 
     renderGame(d);
 
     const signature=JSON.stringify([
       d.round_id,
       d.status,
-      d.claimed,
-      d.mine,
+      [...claimed].sort((a,b)=>a-b),
+      [...mineTickets].sort((a,b)=>a-b),
       [...localSelections].sort((a,b)=>a-b)
     ]);
 
     if(signature!==lastGridSignature){
       lastGridSignature=signature;
       render();
+    }else{
+      updateSlots();
     }
 
     if(d.status!=='open'){
@@ -772,6 +777,18 @@ async function load(){
 confirmBtn.onclick=async()=>{
   if(!localSelections.size)return;
 
+  if(!game||game.status!=='open'){
+    message.textContent='This round is not open.';
+    return;
+  }
+
+  if(mineTickets.size+localSelections.size>2){
+    message.textContent='Maximum two Cartelas per round.';
+    return;
+  }
+
+  const tickets=[...localSelections];
+
   confirmBtn.disabled=true;
   message.textContent='Checking Wallet and buying Cartela...';
 
@@ -783,7 +800,7 @@ confirmBtn.onclick=async()=>{
         'Content-Type':'application/json'
       },
       body:JSON.stringify({
-        tickets:[...localSelections]
+        tickets:tickets
       })
     });
 
@@ -798,13 +815,14 @@ confirmBtn.onclick=async()=>{
     }
 
     localSelections.clear();
+    selected=new Set([...mineTickets]);
 
     message.textContent='✅ Cartela selection saved.';
 
     await load();
 
   }catch(e){
-    message.textContent=e.message;
+    message.textContent=e?.message||'Purchase failed.';
     await load();
   }
 };
@@ -814,7 +832,9 @@ render();
 tickTimer();
 
 setInterval(tickTimer,200);
+
 load();
+
 setInterval(load,1000);
 </script>
 </body>
