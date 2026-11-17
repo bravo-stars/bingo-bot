@@ -446,6 +446,23 @@ async def ticket_status(request):
         wallet["balance_cents"] if wallet else 0
     ) / 100
 
+    # Expose the winning Cartela only after the round is finished.
+    winner_card = None
+    winner_name = None
+    if full_round["status"] == "finished" and full_round["winner_ticket"] is not None:
+        winning_row = next(
+            (r for r in all_rows if r["ticket_no"] == full_round["winner_ticket"]),
+            None
+        )
+        if winning_row:
+            winner_card = json.loads(winning_row["card_json"])
+        winner_entry = next(
+            (w for w in json.loads(full_round["winners_json"] or "[]")
+             if w.get("ticket_no") == full_round["winner_ticket"]),
+            None
+        )
+        winner_name = winner_entry.get("user_name") if winner_entry else None
+
     return web.json_response({
         "round_id": round_info["id"],
         "status": round_info["status"],
@@ -455,6 +472,8 @@ async def ticket_status(request):
         "winner_ticket": round_info["winner_ticket"],
         "winner_user_id": round_info["winner_user_id"],
         "winners": json.loads(full_round["winners_json"] or "[]"),
+        "winner_card": winner_card,
+        "winner_name": winner_name,
         "prize_etb": (full_round["prize_cents"] or 0) / 100,
         "house_etb": (full_round["house_cents"] or 0) / 100,
         "claimed": claimed,
