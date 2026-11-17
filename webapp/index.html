@@ -772,6 +772,7 @@ let loading=false;
 let lastGridSignature='';
 let timerTarget=null;
 let winnerModalRound=null;
+let winnerUntil=null;
 
 /* TIMER */
 
@@ -785,6 +786,14 @@ function tickTimer(){
     );
 
     timer.textContent=left+'s';
+
+    if(winnerUntil!==null){
+      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000));
+      const nextLabel=document.getElementById('winnerNext');
+      if(nextLabel) nextLabel.textContent=winnerLeft>0
+        ? 'NEXT ROUND: '+winnerLeft+'s'
+        : 'OPENING NEXT ROUND…';
+    }
 
     // Lock selection during the final two seconds of the window.
     if(game && game.status==='open'){
@@ -1097,6 +1106,7 @@ function renderGame(d){
   }else{
 
     timerTarget=null;
+    winnerUntil=Number(d.finished_at||0)+10;
 
     document.getElementById('gamePanel').style.display='block';
 
@@ -1187,8 +1197,9 @@ function renderGame(d){
         cardBox.appendChild(table);
       }
 
+      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000));
       document.getElementById('winnerNext').textContent=
-        'NEXT ROUND IN 10 SECONDS';
+        winnerLeft>0?'NEXT ROUND: '+winnerLeft+'s':'OPENING NEXT ROUND…';
 
       if(winnerModalRound!==d.round_id){
 
