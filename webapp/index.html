@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -59,8 +60,6 @@ body{
 .room{
   background:#ffcc18;
   color:#5a4300;
-  align-items:center;
-  justify-content:center;
   padding:8px 4px;
 }
 .room small{color:#604b0b;font-size:11px;margin-bottom:3px}
@@ -167,6 +166,11 @@ body{
   border:2px solid #e08b00;
   box-shadow:0 2px 5px rgba(30,41,59,.14);
   font-size:clamp(11px,2.7vw,18px);
+}
+.ticket.owned{
+  background:#16a34a;
+  color:#fff;
+  border:2px solid #087c35;
 }
 .ticket.selected{
   background:#ffca24;
@@ -348,7 +352,6 @@ body{
     <div id="grid"></div>
   </main>
 
-  <!-- All players' public Cartelas -->
   <div id="cards">
     <div class="empty-cards">Waiting for Cartelas...</div>
   </div>
@@ -398,6 +401,7 @@ const authHeaders=()=>({
 let selected=new Set();
 let localSelections=new Set();
 let claimed=new Set();
+let mineTickets=new Set();
 let game=null;
 let lastRound=null;
 let loading=false;
@@ -415,21 +419,25 @@ function tickTimer(){
 }
 
 function updateSlots(){
+  const chosen=[...selected];
+
   [1,2].forEach((i)=>{
     const el=document.getElementById('slot'+i);
-    const n=[...selected][i-1];
+    const n=chosen[i-1];
 
     el.classList.toggle('filled',!!n);
 
     el.innerHTML=n
-      ? '<div class="plus">🎟 '+n+'</div><div class="slotname">CARTELA '+n+'</div>'
+      ? '<div class="plus">🎟 '+n+'</div><div class="slotname">'+
+        (mineTickets.has(n)?'OWNED CARTELA':'CARTELA '+n)+
+        '</div>'
       : '<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';
   });
 
   confirmBtn.disabled=(
     !game ||
     game.status!=='open' ||
-    selected.size===0
+    localSelections.size===0
   );
 }
 
@@ -441,15 +449,27 @@ function render(){
     b.type='button';
 
     const isTaken=claimed.has(n);
-    b.textContent=isTaken?(n+' 🔒'):n;
+    const isMine=mineTickets.has(n);
+
+    b.textContent=isMine
+      ? n+' ✓'
+      : isTaken
+        ? n+' 🔒'
+        : n;
 
     b.className='ticket'
       +(isTaken?' taken':'')
-      +(selected.has(n)?' selected':'');
+      +(isMine?' owned':'')
+      +(localSelections.has(n)?' selected':'');
 
     b.disabled=isTaken||!game||game.status!=='open';
 
     b.onclick=()=>{
+      if(mineTickets.has(n)){
+        message.textContent='You already own Cartela '+n+'.';
+        return;
+      }
+
       if(selected.has(n)){
         selected.delete(n);
         localSelections.delete(n);
@@ -689,19 +709,23 @@ async function load(){
       (d.claimed||[]).map(Number)
     );
 
+    mineTickets=new Set(
+      (d.mine||[]).map(Number)
+    );
+
     balance.textContent=
       Number(d.balance_etb||0).toFixed(2)+' ETB';
 
-    const mine=(d.mine||[]).map(Number);
-
+    /* Remove local selections that another player bought */
     localSelections=new Set(
       [...localSelections].filter(
-        n=>!claimed.has(n)||mine.includes(n)
+        n=>!claimed.has(n)||mineTickets.has(n)
       )
     );
 
+    /* Existing purchases plus new local selections */
     selected=new Set([
-      ...mine,
+      ...mineTickets,
       ...localSelections
     ]);
 
@@ -727,8 +751,8 @@ async function load(){
       message.textContent=d.status==='drawing'
         ? 'Please wait for the called numbers.'
         : 'Round finished. The next round will open shortly.';
-    }else if(mine.length){
-      message.textContent='Your Cartelas: '+mine.join(', ');
+    }else if(mineTickets.size){
+      message.textContent='Your Cartelas: '+[...mineTickets].join(', ');
     }else{
       message.textContent='Select up to two free Cartelas.';
     }
@@ -745,9 +769,9 @@ async function load(){
   }
 }
 
-/* Buy selected Cartelas */
+/* Buy only newly selected Cartelas */
 confirmBtn.onclick=async()=>{
-  if(!selected.size)return;
+  if(!localSelections.size)return;
 
   confirmBtn.disabled=true;
   message.textContent='Checking Wallet and buying Cartela...';
@@ -760,7 +784,7 @@ confirmBtn.onclick=async()=>{
         'Content-Type':'application/json'
       },
       body:JSON.stringify({
-        tickets:[...selected]
+        tickets:[...localSelections]
       })
     });
 
