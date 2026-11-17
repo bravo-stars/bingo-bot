@@ -192,13 +192,14 @@ def init_db():
 
 
 # ---------- BINGO CARDS ----------
-def make_card():
+def make_card(seed=None):
+    rng = random.Random(seed) if seed is not None else random
     cols = [
-        random.sample(range(1, 16), 5),
-        random.sample(range(16, 31), 5),
-        random.sample(range(31, 46), 5),
-        random.sample(range(46, 61), 5),
-        random.sample(range(61, 76), 5)
+        rng.sample(range(1, 16), 5),
+        rng.sample(range(16, 31), 5),
+        rng.sample(range(31, 46), 5),
+        rng.sample(range(46, 61), 5),
+        rng.sample(range(61, 76), 5)
     ]
     grid = [[cols[c][r] for c in range(5)] for r in range(5)]
     grid[2][2] = "FREE"
@@ -497,6 +498,28 @@ async def ticket_status(request):
 
 
 
+async def preview_tickets(request):
+    uid = request_user(request)
+    raw = request.query.get("numbers", "")
+    try:
+        numbers = sorted({int(x) for x in raw.split(",") if x})
+    except ValueError:
+        raise web.HTTPBadRequest(text="Invalid Cartela numbers.")
+    if not 1 <= len(numbers) <= 2 or any(n < 1 or n > 600 for n in numbers):
+        raise web.HTTPBadRequest(text="Choose one or two Cartelas from 1 to 600.")
+    with db() as con:
+        round_row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
+        if round_row is None or round_row["status"] != "open":
+            raise web.HTTPConflict(text="Cartela selection is closed.")
+        claimed = {r["ticket_no"] for r in con.execute(
+            "SELECT ticket_no FROM round_tickets WHERE round_id=?", (round_row["id"],)
+        )}
+        if any(n in claimed for n in numbers):
+            raise web.HTTPConflict(text="One of the selected Cartelas is already sold.")
+        cards = {str(n): make_card(f"{round_row['id']}:{n}") for n in numbers}
+        return web.json_response({"round_id": round_row["id"], "cards": cards})
+
+
 async def select_tickets(request):
     uid, user_name = request_user_profile(request)
     body = await request.json()
@@ -536,7 +559,7 @@ async def select_tickets(request):
             try:
                 con.execute(
                     "INSERT INTO round_tickets(round_id,ticket_no,user_id,card_json,created_at,user_name) VALUES(?,?,?,?,?,?)",
-                    (round_id, n, uid, json.dumps(make_card()), datetime.now(timezone.utc).isoformat(), user_name)
+                    (round_id, n, uid, json.dumps(make_card(f"{round_id}:{n}")), datetime.now(timezone.utc).isoformat(), user_name)
                 )
             except psycopg2.IntegrityError:
                 raise web.HTTPConflict(text=f"Cartela {n} is already taken. Refresh and choose another.")
@@ -1331,6 +1354,7 @@ def main():
     webapp.router.add_get("/", home)
     webapp.router.add_get("/health", health)
     webapp.router.add_get("/api/tickets", ticket_status)
+    webapp.router.add_get("/api/preview", preview_tickets)
     webapp.router.add_post("/api/select", select_tickets)
     webapp.router.add_post("/telegram", telegram_webhook)
     webapp.on_startup.append(on_startup)
