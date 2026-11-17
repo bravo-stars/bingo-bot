@@ -773,6 +773,7 @@ let lastGridSignature='';
 let timerTarget=null;
 let winnerModalRound=null;
 let winnerUntil=null;
+let previewCards={};
 
 /* TIMER */
 
@@ -809,12 +810,30 @@ function tickTimer(){
   }
 }
 
+async function loadSelectedPreviews(){
+  const nums=[...localSelections].sort((a,b)=>a-b);
+  if(!nums.length || !game || game.status!=='open') return;
+  const missing=nums.filter(n=>!previewCards[String(n)] && !((game.cards||{})[String(n)]));
+  if(!missing.length) return;
+  try{
+    const url='/api/preview?numbers='+encodeURIComponent(missing.join(','));
+    const r=await fetch(url,{method:'GET',headers:authHeaders(),cache:'no-store'});
+    if(!r.ok) throw Error(await r.text());
+    const d=await r.json();
+    if(Number(d.round_id)!==Number(game.round_id)) return;
+    previewCards={...previewCards,...(d.cards||{})};
+    updateSlots();
+  }catch(e){
+    message.textContent='Cartela preview: '+(e?.message||'Could not load card numbers.');
+  }
+}
+
 /* UPDATE SLOTS */
 
 function updateSlots(){
 
   const chosen=[...selected].sort((a,b)=>a-b);
-  const myCards=(game&&game.cards)||{};
+  const myCards={...((game&&game.cards)||{}),...previewCards};
 
   [1,2].forEach((i)=>{
     const el=document.getElementById('slot'+i);
@@ -931,6 +950,7 @@ function render(){
       message.textContent='';
 
       render();
+      loadSelectedPreviews();
     };
 
     grid.appendChild(b);
@@ -1307,6 +1327,7 @@ async function load(){
 
       selected.clear();
       localSelections.clear();
+      previewCards={};
 
       cardsBox.innerHTML='';
     }
@@ -1334,6 +1355,8 @@ async function load(){
       ...mineTickets,
       ...localSelections
     ]);
+
+    await loadSelectedPreviews();
 
     renderMyCards(d);
 
