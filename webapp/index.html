@@ -5,166 +5,794 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>BravoBingo - VIP Room</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 <style>
-:root{--ink:#253247;--muted:#718096;--panel:#e7edf5;--line:#cbd5e1;--white:#fff}
+:root{
+  --ink:#253247;
+  --muted:#718096;
+  --panel:#e7edf5;
+  --line:#cbd5e1;
+  --white:#fff;
+}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{font-family:Arial,Helvetica,sans-serif;background:#e5ebf3;color:var(--ink);overflow:hidden}
-#app{height:100dvh;display:flex;flex-direction:column;max-width:760px;margin:auto}
-.topbar{display:grid;grid-template-columns:1.08fr 1fr 1fr 1.08fr;gap:9px;padding:16px 14px 12px;background:#e5ebf3;z-index:3}
-.stat{height:80px;border-radius:23px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#344256;color:#fff;box-shadow:0 5px 0 rgba(24,39,58,.12),0 8px 14px rgba(30,41,59,.12);font-weight:800}
-.stat small{font-size:12px;font-style:italic;color:#aebdd0;margin-bottom:4px}
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  background:#e5ebf3;
+  color:var(--ink);
+  overflow:hidden;
+}
+#app{
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  max-width:760px;
+  margin:auto;
+}
+.topbar{
+  display:grid;
+  grid-template-columns:1.08fr 1fr 1fr 1.08fr;
+  gap:9px;
+  padding:16px 14px 12px;
+  background:#e5ebf3;
+  z-index:3;
+}
+.stat{
+  height:80px;
+  border-radius:23px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:#344256;
+  color:#fff;
+  box-shadow:0 5px 0 rgba(24,39,58,.12),0 8px 14px rgba(30,41,59,.12);
+  font-weight:800;
+}
+.stat small{
+  font-size:12px;
+  font-style:italic;
+  color:#aebdd0;
+  margin-bottom:4px;
+}
 .stat strong{font-size:22px;line-height:1.1}
-.room{background:#ffcc18;color:#5a4300;align-items:center;justify-content:center;padding:8px 4px}
+.room{
+  background:#ffcc18;
+  color:#5a4300;
+  align-items:center;
+  justify-content:center;
+  padding:8px 4px;
+}
 .room small{color:#604b0b;font-size:11px;margin-bottom:3px}
 .room strong{font-size:15px;white-space:nowrap;line-height:1.1}
 .balance{background:#16a34a}
 .balance small{color:#e2fbe9}
 .balance strong{font-size:16px}
-#gamePanel{padding:4px 14px 10px;background:#e5ebf3;text-align:center}
-#gameStatus{font-size:13px;font-weight:800;margin:2px 0 7px;color:#253247}
-#calledNumbers{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-height:54px;overflow:auto}
-.called{background:#344256;color:#fff;border-radius:7px;padding:4px 6px;font-size:11px;font-weight:800}
-#gamePanel .hint{font-size:10px;color:#718096;margin-top:5px}
-#currentNumber{width:66px;height:66px;border-radius:50%;margin:5px auto 7px;display:flex;align-items:center;justify-content:center;background:#ffca24;color:#263247;font-size:30px;font-weight:900;border:4px solid #fff;box-shadow:0 3px 9px #0002}
-#currentNumber.empty{background:#344256;color:#fff;font-size:14px}
-.marked{background:#ffdf70;font-weight:900;color:#5a4300}
-#winnerDetails{font-size:12px;font-weight:800;color:#166534;margin-top:5px}
-#boardWrap{flex:1;min-height:0;overflow-y:auto;margin:5px 26px 0;padding:18px 17px 22px;border:2px solid #aab8ca;border-radius:62px 62px 0 0;background:#dce4ee;box-shadow:inset 0 2px 6px rgba(35,50,71,.08)}
-#grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:14px 12px}
-.ticket{min-width:0;aspect-ratio:1/1;border:1px solid #d8e0e9;border-radius:15px;background:#fff;color:#202b3a;font-size:clamp(15px,3.5vw,25px);font-weight:800;box-shadow:0 2px 4px rgba(30,41,59,.12);padding:0}
-.ticket.taken{background:#f5a623;color:#fff;border:2px solid #e08b00;box-shadow:0 2px 5px rgba(30,41,59,.14);font-size:clamp(11px,2.7vw,18px)}
-.ticket.selected{background:#ffca24;color:#263247;border:2px solid #e3a900}
-#bottom{flex-shrink:0;background:#fff;padding:14px 9% 20px;display:grid;grid-template-columns:1fr 1fr;gap:22px;z-index:4;box-shadow:0 -5px 16px rgba(30,41,59,.06)}
-.slot{height:140px;border:3px dashed #aab7c7;border-radius:24px;background:#f1f4f8;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8290a3;font-weight:800;letter-spacing:1px;text-align:center;gap:12px}
-.slot .plus{font-size:43px;line-height:35px;color:#bdc8d6}
+
+#gamePanel{
+  padding:4px 14px 10px;
+  background:#e5ebf3;
+  text-align:center;
+}
+#gameStatus{
+  font-size:13px;
+  font-weight:800;
+  margin:2px 0 7px;
+  color:#253247;
+}
+#calledNumbers{
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+  justify-content:center;
+  max-height:54px;
+  overflow:auto;
+}
+.called{
+  background:#344256;
+  color:#fff;
+  border-radius:7px;
+  padding:4px 6px;
+  font-size:11px;
+  font-weight:800;
+}
+#gamePanel .hint{
+  font-size:10px;
+  color:#718096;
+  margin-top:5px;
+}
+#currentNumber{
+  width:66px;
+  height:66px;
+  border-radius:50%;
+  margin:5px auto 7px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#ffca24;
+  color:#263247;
+  font-size:30px;
+  font-weight:900;
+  border:4px solid #fff;
+  box-shadow:0 3px 9px #0002;
+}
+#currentNumber.empty{
+  background:#344256;
+  color:#fff;
+  font-size:14px;
+}
+.marked{
+  background:#ffdf70;
+  font-weight:900;
+  color:#5a4300;
+}
+#winnerDetails{
+  font-size:12px;
+  font-weight:800;
+  color:#166534;
+  margin-top:5px;
+}
+
+#boardWrap{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  margin:5px 26px 0;
+  padding:18px 17px 22px;
+  border:2px solid #aab8ca;
+  border-radius:62px 62px 0 0;
+  background:#dce4ee;
+  box-shadow:inset 0 2px 6px rgba(35,50,71,.08);
+}
+#grid{
+  display:grid;
+  grid-template-columns:repeat(8,minmax(0,1fr));
+  gap:14px 12px;
+}
+.ticket{
+  min-width:0;
+  aspect-ratio:1/1;
+  border:1px solid #d8e0e9;
+  border-radius:15px;
+  background:#fff;
+  color:#202b3a;
+  font-size:clamp(15px,3.5vw,25px);
+  font-weight:800;
+  box-shadow:0 2px 4px rgba(30,41,59,.12);
+  padding:0;
+}
+.ticket.taken{
+  background:#f5a623;
+  color:#fff;
+  border:2px solid #e08b00;
+  box-shadow:0 2px 5px rgba(30,41,59,.14);
+  font-size:clamp(11px,2.7vw,18px);
+}
+.ticket.selected{
+  background:#ffca24;
+  color:#263247;
+  border:2px solid #e3a900;
+}
+.ticket:disabled{cursor:not-allowed;opacity:1}
+
+/* PUBLIC CARTELA CARDS */
+#cards{
+  background:#fff;
+  padding:8px 14px;
+  height:170px;
+  flex-shrink:0;
+  overflow-y:auto;
+  border-top:1px solid #cbd5e1;
+}
+.card{
+  margin:8px 0;
+  padding:10px;
+  background:#f1f4f8;
+  border-radius:12px;
+  border:1px solid #dce3ec;
+}
+.card.mine{
+  border:2px solid #e5b523;
+  background:#fff8df;
+}
+.card h3{
+  margin:0 0 7px;
+  font-size:14px;
+  color:#253247;
+}
+.card-owner{
+  font-size:11px;
+  color:#64748b;
+  margin-bottom:7px;
+}
+.card table{
+  width:100%;
+  border-collapse:collapse;
+  text-align:center;
+  font-size:12px;
+}
+.card td,.card th{
+  border:1px solid #cbd5e1;
+  padding:4px 2px;
+}
+.card th{
+  background:#344256;
+  color:#fff;
+}
+.empty-cards{
+  text-align:center;
+  color:#718096;
+  font-size:12px;
+  padding:20px 5px;
+}
+
+#bottom{
+  flex-shrink:0;
+  background:#fff;
+  padding:14px 9% 20px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:22px;
+  z-index:4;
+  box-shadow:0 -5px 16px rgba(30,41,59,.06);
+}
+.slot{
+  height:140px;
+  border:3px dashed #aab7c7;
+  border-radius:24px;
+  background:#f1f4f8;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:#8290a3;
+  font-weight:800;
+  letter-spacing:1px;
+  text-align:center;
+  gap:12px;
+}
+.slot .plus{
+  font-size:43px;
+  line-height:35px;
+  color:#bdc8d6;
+}
 .slot .slotname{font-size:12px}
-.slot.filled{border-style:solid;border-color:#e5b523;background:#fff8df;color:#604b0b}
-.slot.filled .plus{font-size:24px;line-height:24px;color:#bd8a00}
-#confirm{grid-column:1/-1;border:0;border-radius:12px;padding:13px;background:#16a34a;color:#fff;font-size:16px;font-weight:800}
+.slot.filled{
+  border-style:solid;
+  border-color:#e5b523;
+  background:#fff8df;
+  color:#604b0b;
+}
+.slot.filled .plus{
+  font-size:24px;
+  line-height:24px;
+  color:#bd8a00;
+}
+#confirm{
+  grid-column:1/-1;
+  border:0;
+  border-radius:12px;
+  padding:13px;
+  background:#16a34a;
+  color:#fff;
+  font-size:16px;
+  font-weight:800;
+}
 #confirm:disabled{display:none}
-#message{grid-column:1/-1;text-align:center;min-height:18px;font-size:12px;color:#66758a}
-#cards{background:#fff;padding:0 14px 16px;max-height:170px;overflow:auto}
-.card{margin:8px 0;padding:10px;background:#f1f4f8;border-radius:12px}
-.card h3{margin:0 0 7px;font-size:14px}
-table{width:100%;border-collapse:collapse;text-align:center;font-size:12px}
-td,th{border:1px solid #cbd5e1;padding:4px 2px}
-@media(max-width:380px){.topbar{gap:6px;padding:12px 9px 9px}.stat{height:70px;border-radius:18px}.stat strong{font-size:18px}.room strong,.balance strong{font-size:16px}#boardWrap{margin-left:12px;margin-right:12px;padding:14px 10px}#grid{gap:9px 7px}.ticket{border-radius:11px}#bottom{padding-left:6%;padding-right:6%;gap:12px}.slot{height:120px}}
+#message{
+  grid-column:1/-1;
+  text-align:center;
+  min-height:18px;
+  font-size:12px;
+  color:#66758a;
+}
+
+@media(max-width:380px){
+  .topbar{gap:6px;padding:12px 9px 9px}
+  .stat{height:70px;border-radius:18px}
+  .stat strong{font-size:18px}
+  .room strong,.balance strong{font-size:16px}
+  #boardWrap{
+    margin-left:12px;
+    margin-right:12px;
+    padding:14px 10px;
+  }
+  #grid{gap:9px 7px}
+  .ticket{border-radius:11px}
+  #bottom{
+    padding-left:6%;
+    padding-right:6%;
+    gap:12px;
+  }
+  .slot{height:120px}
+}
 </style>
 </head>
+
 <body>
 <div id="app">
+
   <header class="topbar">
-    <div class="stat room"><small>ROOM</small><strong>VIP 💰💰</strong></div>
-    <div class="stat"><small>SOLD</small><strong id="sold">0</strong></div>
-    <div class="stat"><small>TIME</small><strong id="timer">30s</strong></div>
-    <div class="stat balance"><small>BALANCE</small><strong id="balance">0.00 ETB</strong></div>
+    <div class="stat room">
+      <small>ROOM</small>
+      <strong>VIP 💰💰</strong>
+    </div>
+
+    <div class="stat">
+      <small>SOLD</small>
+      <strong id="sold">0</strong>
+    </div>
+
+    <div class="stat">
+      <small>TIME</small>
+      <strong id="timer">30s</strong>
+    </div>
+
+    <div class="stat balance">
+      <small>BALANCE</small>
+      <strong id="balance">0.00 ETB</strong>
+    </div>
   </header>
-  <section id="gamePanel"><div id="gameStatus">Connecting to game...</div><div id="currentNumber" class="empty">WAIT</div><div id="winnerDetails"></div><div id="calledNumbers"></div><div class="hint">VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins</div></section>
-  <main id="boardWrap"><div id="grid"></div></main>
+
+  <section id="gamePanel">
+    <div id="gameStatus">Connecting to game...</div>
+    <div id="currentNumber" class="empty">WAIT</div>
+    <div id="winnerDetails"></div>
+    <div id="calledNumbers"></div>
+    <div class="hint">
+      VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins
+    </div>
+  </section>
+
+  <main id="boardWrap">
+    <div id="grid"></div>
+  </main>
+
+  <!-- All players' public Cartelas -->
+  <div id="cards">
+    <div class="empty-cards">Waiting for Cartelas...</div>
+  </div>
+
   <section id="bottom">
-    <div class="slot" id="slot1"><div class="plus">+</div><div class="slotname">SLOT 1 EMPTY</div></div>
-    <div class="slot" id="slot2"><div class="plus">+</div><div class="slotname">SLOT 2 EMPTY</div></div>
+    <div class="slot" id="slot1">
+      <div class="plus">+</div>
+      <div class="slotname">SLOT 1 EMPTY</div>
+    </div>
+
+    <div class="slot" id="slot2">
+      <div class="plus">+</div>
+      <div class="slotname">SLOT 2 EMPTY</div>
+    </div>
+
     <button id="confirm" disabled>CONFIRM CARTELA</button>
     <div id="message"></div>
   </section>
-  <div id="cards"></div>
+
 </div>
+
 <script>
-const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
-const grid=document.getElementById('grid'),sold=document.getElementById('sold'),timer=document.getElementById('timer'),balance=document.getElementById('balance');
-const confirmBtn=document.getElementById('confirm'),message=document.getElementById('message'),cardsBox=document.getElementById('cards');
-const gameStatus=document.getElementById('gameStatus'),calledNumbers=document.getElementById('calledNumbers');
-const currentNumber=document.getElementById('currentNumber'),winnerDetails=document.getElementById('winnerDetails');
+const tg=window.Telegram?.WebApp;
+tg?.ready();
+tg?.expand();
+
+const grid=document.getElementById('grid');
+const sold=document.getElementById('sold');
+const timer=document.getElementById('timer');
+const balance=document.getElementById('balance');
+
+const confirmBtn=document.getElementById('confirm');
+const message=document.getElementById('message');
+const cardsBox=document.getElementById('cards');
+
+const gameStatus=document.getElementById('gameStatus');
+const calledNumbers=document.getElementById('calledNumbers');
+const currentNumber=document.getElementById('currentNumber');
+const winnerDetails=document.getElementById('winnerDetails');
+
 document.getElementById('gamePanel').style.display='none';
-const authHeaders=()=>({Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')});
-let selected=new Set(),localSelections=new Set(),claimed=new Set(),game=null,lastRound=null,loading=false,lastGridSignature='';
+
+const authHeaders=()=>({
+  Authorization:'tma '+(window.Telegram?.WebApp?.initData||'')
+});
+
+let selected=new Set();
+let localSelections=new Set();
+let claimed=new Set();
+let game=null;
+let lastRound=null;
+let loading=false;
+let lastGridSignature='';
 let timerTarget=null;
-function tickTimer(){if(timerTarget!==null){const left=Math.max(0,Math.ceil(timerTarget-Date.now()/1000));timer.textContent=left+'s';}}
-function updateSlots(){
-  [1,2].forEach((i)=>{const el=document.getElementById('slot'+i),n=[...selected][i-1];el.classList.toggle('filled',!!n);el.innerHTML=n?'<div class="plus">🎟 '+n+'</div><div class="slotname">CARTELA '+n+'</div>':'<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';});
-  confirmBtn.disabled=!game||game.status!=='open'||selected.size===0;
+
+function tickTimer(){
+  if(timerTarget!==null){
+    const left=Math.max(
+      0,
+      Math.ceil(timerTarget-Date.now()/1000)
+    );
+    timer.textContent=left+'s';
+  }
 }
+
+function updateSlots(){
+  [1,2].forEach((i)=>{
+    const el=document.getElementById('slot'+i);
+    const n=[...selected][i-1];
+
+    el.classList.toggle('filled',!!n);
+
+    el.innerHTML=n
+      ? '<div class="plus">🎟 '+n+'</div><div class="slotname">CARTELA '+n+'</div>'
+      : '<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';
+  });
+
+  confirmBtn.disabled=(
+    !game ||
+    game.status!=='open' ||
+    selected.size===0
+  );
+}
+
 function render(){
   grid.innerHTML='';
+
   for(let n=1;n<=600;n++){
-    const b=document.createElement('button');b.type='button';b.textContent=claimed.has(n)?(n+' 🔒'):n;
-    b.className='ticket'+(claimed.has(n)?' taken':'')+(selected.has(n)?' selected':'');
-    b.disabled=claimed.has(n)||!game||game.status!=='open';
-    b.onclick=()=>{if(selected.has(n)){selected.delete(n);localSelections.delete(n);}else if(selected.size<2){selected.add(n);localSelections.add(n);}else{message.textContent='Maximum two Cartelas.';return;}message.textContent='';render();};
+    const b=document.createElement('button');
+    b.type='button';
+
+    const isTaken=claimed.has(n);
+    b.textContent=isTaken?(n+' 🔒'):n;
+
+    b.className='ticket'
+      +(isTaken?' taken':'')
+      +(selected.has(n)?' selected':'');
+
+    b.disabled=isTaken||!game||game.status!=='open';
+
+    b.onclick=()=>{
+      if(selected.has(n)){
+        selected.delete(n);
+        localSelections.delete(n);
+      }else if(selected.size<2){
+        selected.add(n);
+        localSelections.add(n);
+      }else{
+        message.textContent='Maximum two Cartelas.';
+        return;
+      }
+
+      message.textContent='';
+      render();
+    };
+
     grid.appendChild(b);
   }
-  sold.textContent=claimed.size;updateSlots();
+
+  sold.textContent=claimed.size;
+  updateSlots();
 }
-function showCard(no,rows,drawn){
-  const called=new Set(drawn||[]);
-  const box=document.createElement('div');box.className='card';const h=document.createElement('h3');h.textContent='Cartela '+no;box.appendChild(h);
-  const t=document.createElement('table'),head=document.createElement('tr');
-  for(const x of ['B','I','N','G','O']){const th=document.createElement('th');th.textContent=x;head.appendChild(th);}t.appendChild(head);
-  for(const row of rows){const tr=document.createElement('tr');for(const x of row){const td=document.createElement('td');td.textContent=x;if(x==='FREE'||called.has(x))td.className='marked';tr.appendChild(td);}t.appendChild(tr);}box.appendChild(t);cardsBox.appendChild(box);
+
+/* Display one complete Cartela */
+function showCard(no,rows,drawn,owner,isMine){
+  const called=new Set(
+    (drawn||[]).map(Number)
+  );
+
+  const box=document.createElement('div');
+  box.className='card'+(isMine?' mine':'');
+
+  const h=document.createElement('h3');
+  h.textContent='🎟 Cartela #'+no+(isMine?' · YOU':'');
+  box.appendChild(h);
+
+  const who=document.createElement('div');
+  who.className='card-owner';
+
+  who.textContent=isMine
+    ? '👤 Your Cartela'
+    : '👤 '+(owner||'Player');
+
+  box.appendChild(who);
+
+  const t=document.createElement('table');
+  const head=document.createElement('tr');
+
+  for(const x of ['B','I','N','G','O']){
+    const th=document.createElement('th');
+    th.textContent=x;
+    head.appendChild(th);
+  }
+
+  t.appendChild(head);
+
+  for(const row of (rows||[])){
+    const tr=document.createElement('tr');
+
+    for(const x of row){
+      const td=document.createElement('td');
+      td.textContent=x;
+
+      if(x==='FREE'||called.has(Number(x))){
+        td.className='marked';
+      }
+
+      tr.appendChild(td);
+    }
+
+    t.appendChild(tr);
+  }
+
+  box.appendChild(t);
+  cardsBox.appendChild(box);
 }
+
+function renderPublicCards(d){
+  cardsBox.innerHTML='';
+
+  const publicCards=d.public_cards||{};
+  const entries=Object.entries(publicCards);
+
+  if(entries.length){
+    entries.sort((a,b)=>Number(a[0])-Number(b[0]));
+
+    for(const [n,info] of entries){
+      showCard(
+        n,
+        info.grid,
+        d.drawn||[],
+        info.user_name,
+        Boolean(info.is_mine)
+      );
+    }
+    return;
+  }
+
+  /* Fallback for older backend response */
+  const myCards=d.cards||{};
+  const myEntries=Object.entries(myCards);
+
+  for(const [n,rows] of myEntries){
+    showCard(n,rows,d.drawn||[],'',true);
+  }
+
+  if(!myEntries.length){
+    cardsBox.innerHTML=
+      '<div class="empty-cards">No Cartelas have been selected yet.</div>';
+  }
+}
+
 function renderGame(d){
   const now=Date.now()/1000;
   const drawn=d.drawn||[];
-  currentNumber.textContent=drawn.length?drawn[drawn.length-1]:'WAIT';
-  currentNumber.classList.toggle('empty',!drawn.length);
+
+  currentNumber.textContent=drawn.length
+    ? drawn[drawn.length-1]
+    : 'WAIT';
+
+  currentNumber.classList.toggle(
+    'empty',
+    !drawn.length
+  );
+
   winnerDetails.textContent='';
+
   if(d.status==='open'){
     timerTarget=Number(d.closes_at);
+
     document.getElementById('gamePanel').style.display='none';
-    const left=Math.max(0,Math.ceil(d.closes_at-now));timer.textContent=left+'s';
-    gameStatus.textContent='🟢 ROUND '+d.round_id+' · Choose Cartelas · '+left+' seconds left';
+
+    const left=Math.max(
+      0,
+      Math.ceil(Number(d.closes_at)-now)
+    );
+
+    timer.textContent=left+'s';
+
+    gameStatus.textContent=
+      '🟢 ROUND '+d.round_id+
+      ' · Choose Cartelas · '+left+' seconds left';
+
   }else if(d.status==='drawing'){
     timerTarget=null;
+
     document.getElementById('gamePanel').style.display='block';
-    const left=Math.max(0,Math.ceil((d.next_draw_at||now)-now));timer.textContent=left+'s';
-    gameStatus.textContent='🔴 ROUND '+d.round_id+' · NUMBERS ARE BEING CALLED';
+
+    const left=Math.max(
+      0,
+      Math.ceil((d.next_draw_at||now)-now)
+    );
+
+    timer.textContent=left+'s';
+
+    gameStatus.textContent=
+      '🔴 ROUND '+d.round_id+
+      ' · NUMBERS ARE BEING CALLED';
+
   }else{
     timerTarget=null;
+
     document.getElementById('gamePanel').style.display='block';
     timer.textContent='END';
-    const winners=d.winners||((d.winner_ticket!==null&&d.winner_ticket!==undefined)?[{ticket_no:d.winner_ticket,user_id:d.winner_user_id}]:[]);
+
+    const winners=d.winners||(
+      d.winner_ticket!==null&&d.winner_ticket!==undefined
+        ? [{
+            ticket_no:d.winner_ticket,
+            user_id:d.winner_user_id
+          }]
+        : []
+    );
+
     if(winners.length){
       const myId=Number(tg?.initDataUnsafe?.user?.id);
-      const mine=winners.some(w=>Number(w.user_id)===myId);
-      gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER(S): ')+winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
-      winnerDetails.textContent=winners.map(w=>(w.user_name||('Player '+w.user_id))+' · Cartela '+w.ticket_no+' · '+(Number(w.prize_cents||0)/100).toFixed(2)+' ETB').join(' | ');
-    }else gameStatus.textContent='ROUND '+d.round_id+' · No winner';
+
+      const mine=winners.some(
+        w=>Number(w.user_id)===myId
+      );
+
+      gameStatus.textContent=
+        (mine?'🏆 YOU WON! ':'🏆 WINNER(S): ')+
+        winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
+
+      winnerDetails.textContent=winners.map(w=>
+        (w.user_name||('Player '+w.user_id))+
+        ' · Cartela '+w.ticket_no+
+        ' · '+(Number(w.prize_cents||0)/100).toFixed(2)+
+        ' ETB'
+      ).join(' | ');
+
+    }else{
+      gameStatus.textContent='ROUND '+d.round_id+' · No winner';
+    }
   }
+
   calledNumbers.innerHTML='';
-  (d.drawn||[]).forEach(n=>{const chip=document.createElement('span');chip.className='called';chip.textContent=n;calledNumbers.appendChild(chip);});
+
+  drawn.forEach(n=>{
+    const chip=document.createElement('span');
+    chip.className='called';
+    chip.textContent=n;
+    calledNumbers.appendChild(chip);
+  });
 }
+
 async function load(){
-  if(loading)return;loading=true;
+  if(loading)return;
+
+  loading=true;
+
   try{
-    if(!tg?.initData)throw Error('Please open this page from the Telegram bot.');
-    const r=await fetch('/api/tickets',{headers:authHeaders()});if(!r.ok)throw Error(await r.text());
+    if(!tg?.initData){
+      throw Error('Please open this page from the Telegram bot.');
+    }
+
+    const r=await fetch('/api/tickets',{
+      headers:authHeaders()
+    });
+
+    if(!r.ok){
+      throw Error(await r.text());
+    }
+
     const d=await r.json();
-    if(lastRound!==d.round_id){lastRound=d.round_id;selected.clear();localSelections.clear();cardsBox.innerHTML='';}
-    game=d;claimed=new Set(d.claimed);balance.textContent=Number(d.balance_etb||0).toFixed(2)+' ETB';
-    localSelections=new Set([...localSelections].filter(n=>!claimed.has(n)||d.mine.includes(n)));
-    selected=new Set([...d.mine,...localSelections]);
-    cardsBox.innerHTML='';
-    for(const [n,c] of Object.entries(d.cards||{}))showCard(n,c,d.drawn||[]);
+
+    if(lastRound!==d.round_id){
+      lastRound=d.round_id;
+      selected.clear();
+      localSelections.clear();
+      cardsBox.innerHTML='';
+    }
+
+    game=d;
+
+    claimed=new Set(
+      (d.claimed||[]).map(Number)
+    );
+
+    balance.textContent=
+      Number(d.balance_etb||0).toFixed(2)+' ETB';
+
+    const mine=(d.mine||[]).map(Number);
+
+    localSelections=new Set(
+      [...localSelections].filter(
+        n=>!claimed.has(n)||mine.includes(n)
+      )
+    );
+
+    selected=new Set([
+      ...mine,
+      ...localSelections
+    ]);
+
+    /* Show every player's complete Cartela */
+    renderPublicCards(d);
+
     renderGame(d);
-    const signature=JSON.stringify([d.round_id,d.status,d.claimed,d.mine,[...localSelections].sort((a,b)=>a-b)]);
-    if(signature!==lastGridSignature){lastGridSignature=signature;render();}
-    if(d.status!=='open')message.textContent=d.status==='drawing'?'Please wait for the called numbers.':'Round finished. The next round will open shortly.';
-    else if(d.mine.length)message.textContent='Your Cartelas: '+d.mine.join(', ');
-    else message.textContent='Select up to two free Cartelas.';
-  }catch(e){message.textContent='⚠️ '+(e?.message||'Connection failed. Please reopen from the Telegram bot.');gameStatus.textContent='Connection error';document.getElementById('gamePanel').style.display='none';}
-  finally{loading=false;}
+
+    const signature=JSON.stringify([
+      d.round_id,
+      d.status,
+      d.claimed,
+      d.mine,
+      [...localSelections].sort((a,b)=>a-b)
+    ]);
+
+    if(signature!==lastGridSignature){
+      lastGridSignature=signature;
+      render();
+    }
+
+    if(d.status!=='open'){
+      message.textContent=d.status==='drawing'
+        ? 'Please wait for the called numbers.'
+        : 'Round finished. The next round will open shortly.';
+    }else if(mine.length){
+      message.textContent='Your Cartelas: '+mine.join(', ');
+    }else{
+      message.textContent='Select up to two free Cartelas.';
+    }
+
+  }catch(e){
+    message.textContent=
+      '⚠️ '+(e?.message||'Connection failed. Please reopen from the Telegram bot.');
+
+    gameStatus.textContent='Connection error';
+    document.getElementById('gamePanel').style.display='none';
+
+  }finally{
+    loading=false;
+  }
 }
+
+/* Buy selected Cartelas */
 confirmBtn.onclick=async()=>{
-  confirmBtn.disabled=true;message.textContent='Checking Wallet and buying Cartela...';
+  if(!selected.size)return;
+
+  confirmBtn.disabled=true;
+  message.textContent='Checking Wallet and buying Cartela...';
+
   try{
-    const r=await fetch('/api/select',{method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({tickets:[...selected]})});
-    if(!r.ok){const detail=await r.text();if(r.status===402)throw Error('Wallet balance is not enough. Deposit funds first.');throw Error(detail);}
-    localSelections.clear();message.textContent='✅ Cartela selection saved.';await load();
-  }catch(e){message.textContent=e.message;await load();}
+    const r=await fetch('/api/select',{
+      method:'POST',
+      headers:{
+        ...authHeaders(),
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        tickets:[...selected]
+      })
+    });
+
+    if(!r.ok){
+      const detail=await r.text();
+
+      if(r.status===402){
+        throw Error('Wallet balance is not enough. Deposit funds first.');
+      }
+
+      throw Error(detail);
+    }
+
+    localSelections.clear();
+
+    message.textContent='✅ Cartela selection saved.';
+
+    await load();
+
+  }catch(e){
+    message.textContent=e.message;
+    await load();
+  }
 };
-render(); // Show Cartelas 1–600 immediately, even while Telegram connection is loading.
-tickTimer();setInterval(tickTimer,200);
-load();setInterval(load,1000);
+
+/* Initial display */
+render();
+tickTimer();
+
+setInterval(tickTimer,200);
+load();
+setInterval(load,1000);
 </script>
-</body></html>
+</body>
+</html>
