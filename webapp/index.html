@@ -367,6 +367,7 @@ body{
 }
 .slot{
   height:220px;
+  min-height:220px;
   min-width:0;
   overflow:hidden;
   border:2px solid #cbd5e1;
@@ -387,13 +388,30 @@ body{
 .slot .slotname{font-size:11px;color:#8290a3}
 .slot.filled{border-style:solid;border-color:#cbd5e1;background:#fff;color:#263447}
 .slot-card-title{font-size:12px;font-weight:900;color:#2563eb;text-align:left}
-.slot-card-grid{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-size:clamp(10px,2.8vw,15px)}
-.slot-card-grid th{background:#2563eb;color:#fff;border-radius:3px;padding:3px 0}
+.slot-card-grid{
+  width:100%;
+  height:calc(100% - 20px);
+  table-layout:fixed;
+  border-collapse:separate;
+  border-spacing:2px;
+  font-size:clamp(10px,2.8vw,15px);
+  flex:1;
+}
+.slot-card-grid tr{height:16.66%}
+.slot-card-grid th{
+  background:#2563eb;color:#fff;border-radius:3px;
+  padding:1px 0;font-size:.9em;line-height:1.15;
+}
 .slot-card-grid th:nth-child(2){background:#dc2626}
 .slot-card-grid th:nth-child(3){background:#eab308;color:#422006}
 .slot-card-grid th:nth-child(4){background:#16a34a}
 .slot-card-grid th:nth-child(5){background:#9333ea}
-.slot-card-grid td{background:#f1f5f9;border:1px solid #dbe3ed;border-radius:3px;padding:5px 0;font-weight:900}
+.slot-card-grid td{
+  background:#f1f5f9;border:1px solid #dbe3ed;
+  border-radius:3px;padding:1px 0;font-weight:900;
+  line-height:1.15;overflow:hidden;
+}
+.slot-card-grid td.free{background:#facc15;color:#422006}
 .slot-card-grid td.free{background:#facc15;color:#422006}
 .slot-preview{margin:auto 0;font-size:12px;color:#718096}
 
