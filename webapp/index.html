@@ -4,40 +4,52 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>BravoBingo - VIP Room</title>
+<title>GoodBingo - VIP Room</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
 :root{
   --ink:#253247;
   --muted:#718096;
-  --panel:#e7edf5;
-  --line:#cbd5e1;
+  --panel:#dce4ee;
+  --line:#c5cfdd;
   --white:#fff;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
+
+html,body{
+  height:100%;
+  margin:0;
+}
+
 body{
   font-family:Arial,Helvetica,sans-serif;
   background:#e5ebf3;
   color:var(--ink);
   overflow:hidden;
 }
+
 #app{
+  height:100vh;
   height:100dvh;
   display:flex;
   flex-direction:column;
   max-width:760px;
   margin:auto;
 }
+
+/* TOP STATUS */
+
 .topbar{
   display:grid;
   grid-template-columns:1.08fr 1fr 1fr 1.08fr;
   gap:9px;
-  padding:16px 14px 12px;
+  padding:24px 25px 12px;
   background:#e5ebf3;
   z-index:3;
+  flex-shrink:0;
 }
+
 .stat{
   height:80px;
   border-radius:23px;
@@ -47,38 +59,70 @@ body{
   justify-content:center;
   background:#344256;
   color:#fff;
-  box-shadow:0 5px 0 rgba(24,39,58,.12),0 8px 14px rgba(30,41,59,.12);
+  box-shadow:
+    0 5px 0 rgba(24,39,58,.12),
+    0 8px 14px rgba(30,41,59,.12);
   font-weight:800;
 }
+
 .stat small{
   font-size:12px;
   font-style:italic;
   color:#aebdd0;
   margin-bottom:4px;
 }
-.stat strong{font-size:22px;line-height:1.1}
+
+.stat strong{
+  font-size:22px;
+  line-height:1.1;
+}
+
 .room{
   background:#ffcc18;
   color:#5a4300;
   padding:8px 4px;
 }
-.room small{color:#604b0b;font-size:11px;margin-bottom:3px}
-.room strong{font-size:15px;white-space:nowrap;line-height:1.1}
-.balance{background:#16a34a}
-.balance small{color:#e2fbe9}
-.balance strong{font-size:16px}
+
+.room small{
+  color:#604b0b;
+  font-size:11px;
+  margin-bottom:3px;
+}
+
+.room strong{
+  font-size:15px;
+  white-space:nowrap;
+  line-height:1.1;
+}
+
+.balance{
+  background:#16a34a;
+}
+
+.balance small{
+  color:#e2fbe9;
+}
+
+.balance strong{
+  font-size:16px;
+}
+
+/* GAME AREA */
 
 #gamePanel{
+  display:none;
   padding:4px 14px 10px;
   background:#e5ebf3;
   text-align:center;
 }
+
 #gameStatus{
   font-size:13px;
   font-weight:800;
   margin:2px 0 7px;
   color:#253247;
 }
+
 #calledNumbers{
   display:flex;
   gap:5px;
@@ -87,6 +131,7 @@ body{
   max-height:54px;
   overflow:auto;
 }
+
 .called{
   background:#344256;
   color:#fff;
@@ -95,11 +140,13 @@ body{
   font-size:11px;
   font-weight:800;
 }
+
 #gamePanel .hint{
   font-size:10px;
   color:#718096;
   margin-top:5px;
 }
+
 #currentNumber{
   width:66px;
   height:66px;
@@ -115,132 +162,195 @@ body{
   border:4px solid #fff;
   box-shadow:0 3px 9px #0002;
 }
+
 #currentNumber.empty{
   background:#344256;
   color:#fff;
   font-size:14px;
 }
+
 .marked{
   background:#ffdf70;
   font-weight:900;
   color:#5a4300;
 }
+
+/* WINNER */
+
 #winnerDetails{
   font-size:12px;
   font-weight:800;
   color:#166534;
   margin-top:5px;
 }
-#winnerModal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.72)}
-#winnerModal.show{display:flex}
-#winnerBox{width:min(100%,520px);max-height:90dvh;overflow:auto;background:#fff;border:7px solid #facc15;border-radius:34px;padding:22px 18px;text-align:center;box-shadow:0 18px 55px #0005}
-#winnerBox h2{margin:4px 0 12px;color:#15803d;font-size:25px}
-#winnerPrize{font-size:30px;font-weight:900;color:#15803d;margin:8px 0}
-#winnerCard{margin:14px auto;max-width:330px}
-#winnerCard table{width:100%;border-collapse:separate;border-spacing:4px}
-#winnerCard td{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:8px 3px;font-weight:800}
-#winnerCard td.hit{background:#16a34a;color:white}
-#winnerCard td.free{background:#facc15;color:#422006}
-#winnerNext{margin-top:16px;background:#facc15;border-radius:20px;padding:10px;font-weight:900}
-#winnerClose{border:0;border-radius:14px;padding:12px 24px;background:#1d4ed8;color:white;font-weight:900;font-size:15px}
+
+#winnerModal{
+  position:fixed;
+  inset:0;
+  z-index:20;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(15,23,42,.72);
+}
+
+#winnerModal.show{
+  display:flex;
+}
+
+#winnerBox{
+  width:min(100%,520px);
+  max-height:90dvh;
+  overflow:auto;
+  background:#fff;
+  border:7px solid #facc15;
+  border-radius:34px;
+  padding:22px 18px;
+  text-align:center;
+  box-shadow:0 18px 55px #0005;
+}
+
+#winnerBox h2{
+  margin:4px 0 12px;
+  color:#15803d;
+  font-size:25px;
+}
+
+#winnerPrize{
+  font-size:30px;
+  font-weight:900;
+  color:#15803d;
+  margin:8px 0;
+}
+
+#winnerCard{
+  margin:14px auto;
+  max-width:330px;
+}
+
+#winnerCard table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:4px;
+}
+
+#winnerCard td{
+  background:#f1f5f9;
+  border:1px solid #cbd5e1;
+  border-radius:7px;
+  padding:8px 3px;
+  font-weight:800;
+}
+
+#winnerCard td.hit{
+  background:#16a34a;
+  color:white;
+}
+
+#winnerCard td.free{
+  background:#facc15;
+  color:#422006;
+}
+
+#winnerNext{
+  margin-top:16px;
+  background:#facc15;
+  border-radius:20px;
+  padding:10px;
+  font-weight:900;
+}
+
+#winnerClose{
+  border:0;
+  border-radius:14px;
+  padding:12px 24px;
+  background:#1d4ed8;
+  color:white;
+  font-weight:900;
+  font-size:15px;
+}
+
+/* CARTELA BOARD */
 
 #boardWrap{
   flex:1;
   min-height:0;
   overflow-y:auto;
+  overscroll-behavior:contain;
   margin:5px 26px 0;
-  padding:18px 17px 22px;
+  padding:26px 17px 22px;
   border:2px solid #aab8ca;
   border-radius:62px 62px 0 0;
   background:#dce4ee;
   box-shadow:inset 0 2px 6px rgba(35,50,71,.08);
+  scrollbar-width:thin;
+  scrollbar-color:#9aa9bc transparent;
 }
+
 #grid{
   display:grid;
   grid-template-columns:repeat(8,minmax(0,1fr));
-  gap:14px 12px;
+  gap:20px 20px;
 }
+
+/* NORMAL CARTELA */
+
 .ticket{
   min-width:0;
   aspect-ratio:1/1;
-  border:1px solid #d8e0e9;
+  border:2px solid #c5cfdd;
   border-radius:15px;
-  background:#fff;
-  color:#202b3a;
+  background:#d6deea;
+  color:#aab5c4;
   font-size:clamp(15px,3.5vw,25px);
   font-weight:800;
-  box-shadow:0 2px 4px rgba(30,41,59,.12);
+  box-shadow:0 2px 4px rgba(30,41,59,.08);
   padding:0;
+  -webkit-tap-highlight-color:transparent;
 }
-.ticket.taken{
-  background:#f5a623;
-  color:#fff;
-  border:2px solid #e08b00;
-  box-shadow:0 2px 5px rgba(30,41,59,.14);
-  font-size:clamp(11px,2.7vw,18px);
-}
-.ticket.owned{
-  background:#16a34a;
-  color:#fff;
-  border:2px solid #087c35;
-}
-.ticket.selected{
-  background:#ffca24;
-  color:#263247;
-  border:2px solid #e3a900;
-}
-.ticket:disabled{cursor:not-allowed;opacity:1}
 
-/* PRIVATE CARTELA CARDS */
-#cards{
+/* SOLD CARTELA */
+
+.ticket.taken{
+  background:#d6deea;
+  color:#aab5c4;
+  border:2px solid #c5cfdd;
+  box-shadow:0 2px 4px rgba(30,41,59,.08);
+}
+
+/* OWNED CARTELA */
+
+.ticket.owned{
   background:#fff;
-  padding:8px 14px;
-  height:170px;
-  flex-shrink:0;
-  overflow-y:auto;
-  border-top:1px solid #cbd5e1;
+  color:#202b3a;
+  border:2px solid #fff;
+  box-shadow:0 3px 8px rgba(30,41,59,.13);
 }
-.card{
-  margin:8px 0;
-  padding:10px;
-  background:#f1f4f8;
-  border-radius:12px;
-  border:1px solid #dce3ec;
+
+/* SELECTED CARTELA */
+
+.ticket.selected{
+  background:#fff;
+  color:#202b3a;
+  border:2px solid #fff;
+  box-shadow:0 3px 8px rgba(30,41,59,.13);
 }
-.card.mine{
-  border:2px solid #e5b523;
-  background:#fff8df;
+
+.ticket:disabled{
+  cursor:not-allowed;
+  opacity:1;
 }
-.card h3{
-  margin:0 0 7px;
-  font-size:14px;
-  color:#253247;
+
+/* HIDE PRIVATE CARD LIST
+   Keep private card data handling in JavaScript.
+*/
+
+#cards{
+  display:none !important;
 }
-.card-owner{
-  font-size:11px;
-  color:#64748b;
-  margin-bottom:7px;
-}
-.card table{
-  width:100%;
-  border-collapse:collapse;
-  text-align:center;
-  font-size:12px;
-}
-.card td,.card th{
-  border:1px solid #cbd5e1;
-  padding:4px 2px;
-}
-.card th{
-  background:#344256;
-  color:#fff;
-}
-.empty-cards{
-  text-align:center;
-  color:#718096;
-  font-size:12px;
-  padding:20px 5px;
-}
+
+/* BOTTOM SLOTS */
 
 #bottom{
   flex-shrink:0;
@@ -252,8 +362,9 @@ body{
   z-index:4;
   box-shadow:0 -5px 16px rgba(30,41,59,.06);
 }
+
 .slot{
-  height:140px;
+  height:clamp(140px,18vh,270px);
   border:3px dashed #aab7c7;
   border-radius:24px;
   background:#f1f4f8;
@@ -265,25 +376,32 @@ body{
   font-weight:800;
   letter-spacing:1px;
   text-align:center;
-  gap:12px;
+  gap:18px;
 }
+
 .slot .plus{
   font-size:43px;
   line-height:35px;
   color:#bdc8d6;
 }
-.slot .slotname{font-size:12px}
+
+.slot .slotname{
+  font-size:12px;
+}
+
 .slot.filled{
   border-style:solid;
   border-color:#e5b523;
   background:#fff8df;
   color:#604b0b;
 }
+
 .slot.filled .plus{
   font-size:24px;
   line-height:24px;
   color:#bd8a00;
 }
+
 #confirm{
   grid-column:1/-1;
   border:0;
@@ -294,7 +412,11 @@ body{
   font-size:16px;
   font-weight:800;
 }
-#confirm:disabled{display:none}
+
+#confirm:disabled{
+  display:none;
+}
+
 #message{
   grid-column:1/-1;
   text-align:center;
@@ -303,102 +425,161 @@ body{
   color:#66758a;
 }
 
+/* MOBILE */
+
 @media(max-width:380px){
-  .topbar{gap:6px;padding:12px 9px 9px}
-  .stat{height:70px;border-radius:18px}
-  .stat strong{font-size:18px}
-  .room strong,.balance strong{font-size:16px}
+
+  .topbar{
+    gap:6px;
+    padding:16px 9px 9px;
+  }
+
+  .stat{
+    height:70px;
+    border-radius:18px;
+  }
+
+  .stat strong{
+    font-size:18px;
+  }
+
+  .room strong,
+  .balance strong{
+    font-size:15px;
+  }
+
   #boardWrap{
     margin-left:12px;
     margin-right:12px;
-    padding:14px 10px;
+    padding:18px 10px;
   }
-  #grid{gap:9px 7px}
-  .ticket{border-radius:11px}
+
+  #grid{
+    gap:12px 7px;
+  }
+
+  .ticket{
+    border-radius:11px;
+  }
+
   #bottom{
     padding-left:6%;
     padding-right:6%;
     gap:12px;
   }
-  .slot{height:120px}
+
+  .slot{
+    height:clamp(120px,17vh,230px);
+  }
 }
 </style>
 </head>
 
 <body>
+
 <div id="app">
 
-  <header class="topbar">
-    <div class="stat room">
-      <small>ROOM</small>
-      <strong>VIP 💰💰</strong>
-    </div>
+<header class="topbar">
 
-    <div class="stat">
-      <small>SOLD</small>
-      <strong id="sold">0</strong>
-    </div>
-
-    <div class="stat">
-      <small>TIME</small>
-      <strong id="timer">30s</strong>
-    </div>
-
-    <div class="stat balance">
-      <small>BALANCE</small>
-      <strong id="balance">0.00 ETB</strong>
-    </div>
-  </header>
-
-  <section id="gamePanel">
-    <div id="gameStatus">Connecting to game...</div>
-    <div id="currentNumber" class="empty">WAIT</div>
-    <div id="winnerDetails"></div>
-    <div id="calledNumbers"></div>
-    <div class="hint">
-      VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins
-    </div>
-  </section>
-
-  <main id="boardWrap">
-    <div id="grid"></div>
-  </main>
-
-  <div id="cards">
-    <div class="empty-cards">Your Cartelas will appear here after purchase.</div>
+  <div class="stat room">
+    <small>ROOM</small>
+    <strong>VIP 💰💰</strong>
   </div>
 
-  <section id="bottom">
-    <div class="slot" id="slot1">
-      <div class="plus">+</div>
-      <div class="slotname">SLOT 1 EMPTY</div>
-    </div>
+  <div class="stat">
+    <small>SOLD</small>
+    <strong id="sold">0</strong>
+  </div>
 
-    <div class="slot" id="slot2">
-      <div class="plus">+</div>
-      <div class="slotname">SLOT 2 EMPTY</div>
-    </div>
+  <div class="stat">
+    <small>TIME</small>
+    <strong id="timer">30s</strong>
+  </div>
 
-    <button id="confirm" disabled>CONFIRM CARTELA</button>
-    <div id="message"></div>
-  </section>
+  <div class="stat balance">
+    <small>BALANCE</small>
+    <strong id="balance">0.00 ETB</strong>
+  </div>
+
+</header>
+
+<section id="gamePanel">
+
+  <div id="gameStatus">Connecting to game...</div>
+
+  <div id="currentNumber" class="empty">WAIT</div>
+
+  <div id="winnerDetails"></div>
+
+  <div id="calledNumbers"></div>
+
+  <div class="hint">
+    VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins
+  </div>
+
+</section>
+
+<main id="boardWrap">
+  <div id="grid"></div>
+</main>
+
+<div id="cards">
+  <div class="empty-cards">
+    Your Cartelas will appear here after purchase.
+  </div>
+</div>
+
+<section id="bottom">
+
+  <div class="slot" id="slot1">
+    <div class="plus">+</div>
+    <div class="slotname">SLOT 1 EMPTY</div>
+  </div>
+
+  <div class="slot" id="slot2">
+    <div class="plus">+</div>
+    <div class="slotname">SLOT 2 EMPTY</div>
+  </div>
+
+  <button id="confirm" disabled>
+    CONFIRM CARTELA
+  </button>
+
+  <div id="message"></div>
+
+</section>
 
 </div>
 
 <div id="winnerModal" role="dialog" aria-modal="true" aria-label="Round winner">
+
   <div id="winnerBox">
-    <div style="font-size:14px;font-weight:900;color:#64748b">ROUND WINNER</div>
+
+    <div style="font-size:14px;font-weight:900;color:#64748b">
+      ROUND WINNER
+    </div>
+
     <h2 id="winnerTitle">🏆 BINGO!</h2>
+
     <div id="winnerName" style="font-size:19px;font-weight:900"></div>
+
     <div id="winnerPrize">0.00 ETB</div>
-    <div style="font-size:11px;letter-spacing:2px;color:#64748b;font-weight:900">TOTAL PRIZE</div>
+
+    <div style="font-size:11px;letter-spacing:2px;color:#64748b;font-weight:900">
+      TOTAL PRIZE
+    </div>
+
     <div id="winnerCard"></div>
+
     <div id="winnerNext">NEXT ROUND STARTING…</div>
+
     <button id="winnerClose" type="button">CLOSE</button>
+
   </div>
 </div>
 
 <script>
+
 const tg=window.Telegram?.WebApp;
 
 tg?.ready();
@@ -437,7 +618,9 @@ let timerTarget=null;
 let winnerModalRound=null;
 
 function tickTimer(){
+
   if(timerTarget!==null){
+
     const left=Math.max(
       0,
       Math.ceil(timerTarget-Date.now()/1000)
@@ -448,9 +631,11 @@ function tickTimer(){
 }
 
 function updateSlots(){
+
   const chosen=[...selected].sort((a,b)=>a-b);
 
   [1,2].forEach((i)=>{
+
     const el=document.getElementById('slot'+i);
     const n=chosen[i-1];
 
@@ -471,10 +656,13 @@ function updateSlots(){
 }
 
 function render(){
+
   grid.innerHTML='';
 
   for(let n=1;n<=600;n++){
+
     const b=document.createElement('button');
+
     b.type='button';
 
     const isTaken=claimed.has(n);
@@ -499,18 +687,22 @@ function render(){
     );
 
     b.onclick=()=>{
+
       if(mineTickets.has(n)){
+
         message.textContent='You already own Cartela '+n+'.';
         return;
       }
 
       if(localSelections.has(n)){
+
         localSelections.delete(n);
         selected.delete(n);
+
       }else{
-        // Maximum two Cartelas in total,
-        // including already purchased Cartelas.
+
         if(mineTickets.size+localSelections.size>=2){
+
           message.textContent='Maximum two Cartelas per round.';
           return;
         }
@@ -520,6 +712,7 @@ function render(){
       }
 
       message.textContent='';
+
       render();
     };
 
@@ -531,40 +724,54 @@ function render(){
   updateSlots();
 }
 
-/* Display one Cartela belonging to this user */
+/* PRIVATE CARTELA DISPLAY */
+
 function showCard(no,rows,drawn){
+
   const called=new Set(
     (drawn||[]).map(Number)
   );
 
   const box=document.createElement('div');
+
   box.className='card mine';
 
   const h=document.createElement('h3');
+
   h.textContent='🎟 Cartela #'+no+' · YOU';
+
   box.appendChild(h);
 
   const who=document.createElement('div');
+
   who.className='card-owner';
   who.textContent='👤 Your Cartela';
+
   box.appendChild(who);
 
   const t=document.createElement('table');
+
   const head=document.createElement('tr');
 
   for(const x of ['B','I','N','G','O']){
+
     const th=document.createElement('th');
+
     th.textContent=x;
+
     head.appendChild(th);
   }
 
   t.appendChild(head);
 
   for(const row of (rows||[])){
+
     const tr=document.createElement('tr');
 
     for(const x of row){
+
       const td=document.createElement('td');
+
       td.textContent=x;
 
       if(x==='FREE'||called.has(Number(x))){
@@ -578,37 +785,44 @@ function showCard(no,rows,drawn){
   }
 
   box.appendChild(t);
+
   cardsBox.appendChild(box);
 }
 
-/* IMPORTANT:
-   Only d.cards is displayed.
-   Never display public_cards or other players' cards.
-*/
 function renderMyCards(d){
+
   cardsBox.innerHTML='';
 
   const myCards=d.cards||{};
+
   const entries=Object.entries(myCards);
 
   if(entries.length){
+
     entries.sort((a,b)=>Number(a[0])-Number(b[0]));
 
     for(const [n,rows] of entries){
+
       showCard(
         n,
         rows,
         d.drawn||[]
       );
     }
+
   }else{
+
     cardsBox.innerHTML=
       '<div class="empty-cards">Your Cartelas will appear here after purchase.</div>';
   }
 }
 
+/* GAME STATUS */
+
 function renderGame(d){
+
   const now=Date.now()/1000;
+
   const drawn=d.drawn||[];
 
   currentNumber.textContent=drawn.length
@@ -623,6 +837,7 @@ function renderGame(d){
   winnerDetails.textContent='';
 
   if(d.status==='open'){
+
     timerTarget=Number(d.closes_at);
 
     document.getElementById('gamePanel').style.display='none';
@@ -639,6 +854,7 @@ function renderGame(d){
       ' · Choose Cartelas · '+left+' seconds left';
 
   }else if(d.status==='drawing'){
+
     timerTarget=null;
 
     document.getElementById('gamePanel').style.display='block';
@@ -655,9 +871,11 @@ function renderGame(d){
       ' · NUMBERS ARE BEING CALLED';
 
   }else{
+
     timerTarget=null;
 
     document.getElementById('gamePanel').style.display='block';
+
     timer.textContent='END';
 
     const winners=d.winners||(
@@ -670,39 +888,85 @@ function renderGame(d){
     );
 
     if(winners.length){
+
       const myId=Number(tg?.initDataUnsafe?.user?.id);
-      const mine=winners.some(w=>Number(w.user_id)===myId);
+
+      const mine=winners.some(
+        w=>Number(w.user_id)===myId
+      );
+
       const first=winners[0];
-      const prize=Number(first.prize_cents||0)/100;
-      gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER: ')+winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
-      winnerDetails.textContent=winners.map(w=>(w.user_name||('Player '+w.user_id))+' · Cartela '+w.ticket_no+' · '+(Number(w.prize_cents||0)/100).toFixed(2)+' ETB').join(' | ');
-      document.getElementById('winnerTitle').textContent=mine?'🎉 YOU WON!':'🏆 BINGO!';
-      document.getElementById('winnerName').textContent=d.winner_name||first.user_name||('Player '+first.user_id);
-      document.getElementById('winnerPrize').textContent=Number(d.prize_etb||0).toFixed(2)+' ETB';
+
+      gameStatus.textContent=
+        (mine?'🏆 YOU WON! ':'🏆 WINNER: ')+
+        winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
+
+      winnerDetails.textContent=winners.map(
+        w=>(w.user_name||('Player '+w.user_id))+
+        ' · Cartela '+w.ticket_no+
+        ' · '+
+        (Number(w.prize_cents||0)/100).toFixed(2)+
+        ' ETB'
+      ).join(' | ');
+
+      document.getElementById('winnerTitle').textContent=
+        mine?'🎉 YOU WON!':'🏆 BINGO!';
+
+      document.getElementById('winnerName').textContent=
+        d.winner_name||
+        first.user_name||
+        ('Player '+first.user_id);
+
+      document.getElementById('winnerPrize').textContent=
+        Number(d.prize_etb||0).toFixed(2)+' ETB';
+
       const cardBox=document.getElementById('winnerCard');
+
       cardBox.innerHTML='';
+
       if(Array.isArray(d.winner_card)){
+
         const table=document.createElement('table');
+
         d.winner_card.forEach(row=>{
+
           const tr=document.createElement('tr');
+
           row.forEach(value=>{
+
             const td=document.createElement('td');
+
             td.textContent=value==='FREE'?'★':value;
-            if(value==='FREE') td.className='free';
-            else if(drawn.includes(Number(value))) td.className='hit';
+
+            if(value==='FREE'){
+              td.className='free';
+            }else if(drawn.includes(Number(value))){
+              td.className='hit';
+            }
+
             tr.appendChild(td);
           });
+
           table.appendChild(tr);
         });
+
         cardBox.appendChild(table);
       }
-      document.getElementById('winnerNext').textContent='NEXT ROUND IN 10 SECONDS';
+
+      document.getElementById('winnerNext').textContent=
+        'NEXT ROUND IN 10 SECONDS';
+
       if(winnerModalRound!==d.round_id){
+
         winnerModalRound=d.round_id;
+
         document.getElementById('winnerModal').classList.add('show');
       }
+
     }else{
+
       gameStatus.textContent='ROUND '+d.round_id+' · No winner';
+
       document.getElementById('winnerModal').classList.remove('show');
     }
   }
@@ -710,40 +974,56 @@ function renderGame(d){
   calledNumbers.innerHTML='';
 
   drawn.forEach(n=>{
+
     const chip=document.createElement('span');
+
     chip.className='called';
     chip.textContent=n;
+
     calledNumbers.appendChild(chip);
   });
 }
 
+/* LOAD GAME DATA */
+
 async function load(){
+
   if(loading)return;
 
   loading=true;
 
   try{
+
     if(!tg?.initData){
+
       throw Error('Please open this page from the Telegram bot.');
     }
 
     const r=await fetch('/api/tickets',{
+
       method:'GET',
+
       headers:authHeaders(),
+
       cache:'no-store'
     });
 
     if(!r.ok){
+
       throw Error(await r.text());
     }
 
     const d=await r.json();
-d.status=String(d.status||'').toLowerCase().trim();
+
+    d.status=String(d.status||'').toLowerCase().trim();
 
     if(lastRound!==d.round_id){
+
       lastRound=d.round_id;
+
       selected.clear();
       localSelections.clear();
+
       cardsBox.innerHTML='';
     }
 
@@ -760,96 +1040,122 @@ d.status=String(d.status||'').toLowerCase().trim();
     balance.textContent=
       Number(d.balance_etb||0).toFixed(2)+' ETB';
 
-    // Remove selections bought by another player.
     localSelections=new Set(
       [...localSelections].filter(
         n=>!claimed.has(n)||mineTickets.has(n)
       )
     );
 
-    // Keep owned tickets and local selections.
     selected=new Set([
       ...mineTickets,
       ...localSelections
     ]);
 
-    // Display only this user's Cartelas.
     renderMyCards(d);
 
     renderGame(d);
 
     const signature=JSON.stringify([
+
       d.round_id,
       d.status,
+
       [...claimed].sort((a,b)=>a-b),
+
       [...mineTickets].sort((a,b)=>a-b),
+
       [...localSelections].sort((a,b)=>a-b)
     ]);
 
     if(signature!==lastGridSignature){
+
       lastGridSignature=signature;
+
       render();
+
     }else{
+
       updateSlots();
     }
 
     if(d.status!=='open'){
+
       message.textContent=d.status==='drawing'
         ? 'Please wait for the called numbers.'
         : 'Round finished. The next round will open shortly.';
+
     }else if(mineTickets.size){
+
       message.textContent='Your Cartelas: '+[...mineTickets].join(', ');
+
     }else{
+
       message.textContent='Select up to two free Cartelas.';
     }
 
   }catch(e){
+
     message.textContent=
       '⚠️ '+(e?.message||'Connection failed. Please reopen from the Telegram bot.');
 
     gameStatus.textContent='Connection error';
+
     document.getElementById('gamePanel').style.display='none';
 
   }finally{
+
     loading=false;
   }
 }
 
-/* Buy only newly selected Cartelas */
+/* PURCHASE CARTELA */
+
 confirmBtn.onclick=async()=>{
+
   if(!localSelections.size)return;
 
   if(!game||game.status!=='open'){
+
     message.textContent='This round is not open.';
+
     return;
   }
 
   if(mineTickets.size+localSelections.size>2){
+
     message.textContent='Maximum two Cartelas per round.';
+
     return;
   }
 
   const tickets=[...localSelections];
 
   confirmBtn.disabled=true;
+
   message.textContent='Checking Wallet and buying Cartela...';
 
   try{
+
     const r=await fetch('/api/select',{
+
       method:'POST',
+
       headers:{
         ...authHeaders(),
         'Content-Type':'application/json'
       },
+
       body:JSON.stringify({
         tickets:tickets
       })
     });
 
     if(!r.ok){
+
       const detail=await r.text();
 
       if(r.status===402){
+
         throw Error('Wallet balance is not enough. Deposit funds first.');
       }
 
@@ -857,6 +1163,7 @@ confirmBtn.onclick=async()=>{
     }
 
     localSelections.clear();
+
     selected=new Set([...mineTickets]);
 
     message.textContent='✅ Cartela selection saved.';
@@ -864,17 +1171,24 @@ confirmBtn.onclick=async()=>{
     await load();
 
   }catch(e){
+
     message.textContent=e?.message||'Purchase failed.';
+
     await load();
   }
 };
 
+/* WINNER CLOSE */
+
 document.getElementById('winnerClose').onclick=()=>{
+
   document.getElementById('winnerModal').classList.remove('show');
 };
 
-/* Initial display */
+/* INITIAL START */
+
 render();
+
 tickTimer();
 
 setInterval(tickTimer,200);
@@ -882,6 +1196,8 @@ setInterval(tickTimer,200);
 load();
 
 setInterval(load,1000);
+
 </script>
+
 </body>
 </html>
