@@ -131,6 +131,18 @@ body{
   color:#166534;
   margin-top:5px;
 }
+#winnerModal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.72)}
+#winnerModal.show{display:flex}
+#winnerBox{width:min(100%,520px);max-height:90dvh;overflow:auto;background:#fff;border:7px solid #facc15;border-radius:34px;padding:22px 18px;text-align:center;box-shadow:0 18px 55px #0005}
+#winnerBox h2{margin:4px 0 12px;color:#15803d;font-size:25px}
+#winnerPrize{font-size:30px;font-weight:900;color:#15803d;margin:8px 0}
+#winnerCard{margin:14px auto;max-width:330px}
+#winnerCard table{width:100%;border-collapse:separate;border-spacing:4px}
+#winnerCard td{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:8px 3px;font-weight:800}
+#winnerCard td.hit{background:#16a34a;color:white}
+#winnerCard td.free{background:#facc15;color:#422006}
+#winnerNext{margin-top:16px;background:#facc15;border-radius:20px;padding:10px;font-weight:900}
+#winnerClose{border:0;border-radius:14px;padding:12px 24px;background:#1d4ed8;color:white;font-weight:900;font-size:15px}
 
 #boardWrap{
   flex:1;
@@ -371,6 +383,19 @@ body{
     <div id="message"></div>
   </section>
 
+</div>
+
+<div id="winnerModal" role="dialog" aria-modal="true" aria-label="Round winner">
+  <div id="winnerBox">
+    <div style="font-size:14px;font-weight:900;color:#64748b">ROUND WINNER</div>
+    <h2 id="winnerTitle">🏆 BINGO!</h2>
+    <div id="winnerName" style="font-size:19px;font-weight:900"></div>
+    <div id="winnerPrize">0.00 ETB</div>
+    <div style="font-size:11px;letter-spacing:2px;color:#64748b;font-weight:900">TOTAL PRIZE</div>
+    <div id="winnerCard"></div>
+    <div id="winnerNext">NEXT ROUND STARTING…</div>
+    <button id="winnerClose" type="button">CLOSE</button>
+  </div>
 </div>
 
 <script>
@@ -645,24 +670,36 @@ function renderGame(d){
 
     if(winners.length){
       const myId=Number(tg?.initDataUnsafe?.user?.id);
-
-      const mine=winners.some(
-        w=>Number(w.user_id)===myId
-      );
-
-      gameStatus.textContent=
-        (mine?'🏆 YOU WON! ':'🏆 WINNER(S): ')+
-        winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
-
-      winnerDetails.textContent=winners.map(w=>
-        (w.user_name||('Player '+w.user_id))+
-        ' · Cartela '+w.ticket_no+
-        ' · '+(Number(w.prize_cents||0)/100).toFixed(2)+
-        ' ETB'
-      ).join(' | ');
-
+      const mine=winners.some(w=>Number(w.user_id)===myId);
+      const first=winners[0];
+      const prize=Number(first.prize_cents||0)/100;
+      gameStatus.textContent=(mine?'🏆 YOU WON! ':'🏆 WINNER: ')+winners.map(w=>'CARTELA '+w.ticket_no).join(' · ');
+      winnerDetails.textContent=winners.map(w=>(w.user_name||('Player '+w.user_id))+' · Cartela '+w.ticket_no+' · '+(Number(w.prize_cents||0)/100).toFixed(2)+' ETB').join(' | ');
+      document.getElementById('winnerTitle').textContent=mine?'🎉 YOU WON!':'🏆 BINGO!';
+      document.getElementById('winnerName').textContent=d.winner_name||first.user_name||('Player '+first.user_id);
+      document.getElementById('winnerPrize').textContent=prize.toFixed(2)+' ETB';
+      const cardBox=document.getElementById('winnerCard');
+      cardBox.innerHTML='';
+      if(Array.isArray(d.winner_card)){
+        const table=document.createElement('table');
+        d.winner_card.forEach(row=>{
+          const tr=document.createElement('tr');
+          row.forEach(value=>{
+            const td=document.createElement('td');
+            td.textContent=value==='FREE'?'★':value;
+            if(value==='FREE') td.className='free';
+            else if(drawn.includes(Number(value))) td.className='hit';
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+        cardBox.appendChild(table);
+      }
+      document.getElementById('winnerNext').textContent='NEXT ROUND IN 10 SECONDS';
+      document.getElementById('winnerModal').classList.add('show');
     }else{
       gameStatus.textContent='ROUND '+d.round_id+' · No winner';
+      document.getElementById('winnerModal').classList.remove('show');
     }
   }
 
@@ -826,6 +863,10 @@ confirmBtn.onclick=async()=>{
     message.textContent=e?.message||'Purchase failed.';
     await load();
   }
+};
+
+document.getElementById('winnerClose').onclick=()=>{
+  document.getElementById('winnerModal').classList.remove('show');
 };
 
 /* Initial display */
