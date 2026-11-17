@@ -426,6 +426,31 @@ body{
 
 /* MOBILE */
 
+/* LIVE BINGO SCREEN — shown after the 30-second selection period */
+#liveGameScreen{display:none;flex:1;min-height:0;overflow:hidden;background:#eef2f8;padding:8px;}
+#liveSummary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#253247;color:#fff;padding:8px;border-radius:12px;margin-bottom:8px;text-align:center;}
+#liveSummary .liveStat{min-width:0;font-size:11px;font-weight:800;color:#b9c6d8;}
+#liveSummary strong{display:block;font-size:20px;color:#fff;margin-top:3px;}
+#liveSummary #livePrize{color:#4ade80;}
+#liveColumns{height:calc(100% - 65px);min-height:0;display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:8px;}
+#ballBoard{min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(16,minmax(26px,1fr));gap:3px;background:#f1f5f9;padding:4px;border-radius:10px;align-content:start;}
+.ballCell{min-width:0;min-height:26px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#182538;font-weight:900;font-size:clamp(11px,2.8vw,17px);display:flex;align-items:center;justify-content:center;}
+.ballCell.head{color:#fff;font-style:italic;font-size:clamp(15px,3.5vw,21px);}
+.ballCell.head:nth-child(5n+1){background:#2563eb}.ballCell.head:nth-child(5n+2){background:#dc2626}.ballCell.head:nth-child(5n+3){background:#eab308}.ballCell.head:nth-child(5n+4){background:#16a34a}.ballCell.head:nth-child(5n){background:#9333ea}
+.ballCell.called{background:#16a34a!important;color:#fff;border-color:#15803d;}
+.ballCell.latest{background:#facc15!important;color:#172033;border:2px solid #b45309;}
+#liveRight{position:relative;min-height:0;overflow-y:auto;padding-top:52px;}
+#liveCurrent{position:absolute;z-index:2;top:0;left:50%;transform:translateX(-50%);width:112px;height:112px;border-radius:50%;border:6px solid #fff;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:29px;font-weight:900;box-shadow:0 4px 12px #0003;}
+#liveCards{padding-top:8px;}
+#liveCards .card{margin:8px 0 14px;background:#f1f5f9;border:2px solid #cbd5e1;border-radius:14px;padding:8px;}
+#liveCards .card h3{font-size:12px;}
+#liveCards .card table{font-size:clamp(10px,2.6vw,14px);border-spacing:3px;border-collapse:separate;}
+#liveCards .card td,#liveCards .card th{border-radius:5px;padding:7px 2px;font-weight:900;}
+#liveCards .card th:nth-child(1){background:#2563eb}#liveCards .card th:nth-child(2){background:#dc2626}#liveCards .card th:nth-child(3){background:#eab308}#liveCards .card th:nth-child(4){background:#16a34a}#liveCards .card th:nth-child(5){background:#9333ea}
+#liveCards .card td.marked{background:#16a34a;color:#fff;}
+#liveCards .empty-cards{background:#fff;border-radius:12px;padding:18px 8px;}
+@media(max-width:380px){#liveGameScreen{padding:5px}#liveColumns{gap:5px}#liveSummary strong{font-size:17px}#liveCurrent{width:94px;height:94px;font-size:24px}#liveRight{padding-top:46px}#ballBoard{gap:2px;padding:3px}.ballCell{min-height:23px}}
+
 @media(max-width:380px){
 
   .topbar{
@@ -501,6 +526,22 @@ body{
     </div>
 
   </header>
+
+
+  <section id="liveGameScreen" aria-label="Live Bingo game">
+    <div id="liveSummary">
+      <div class="liveStat">DERASH<strong id="livePrize">0 ETB</strong></div>
+      <div class="liveStat">BALLS<strong id="liveBalls">0/75</strong></div>
+      <div class="liveStat">PLAYERS<strong id="livePlayers">0</strong></div>
+    </div>
+    <div id="liveColumns">
+      <div id="ballBoard" aria-label="Bingo numbers board"></div>
+      <div id="liveRight">
+        <div id="liveCurrent">WAIT</div>
+        <div id="liveCards"></div>
+      </div>
+    </div>
+  </section>
 
   <section id="gamePanel">
 
@@ -993,6 +1034,34 @@ function renderGame(d){
   });
 }
 
+
+function bingoLetter(n){return n<=15?'B':n<=30?'I':n<=45?'N':n<=60?'G':'O';}
+function renderLiveGame(d){
+  const stage=document.getElementById('liveGameScreen');
+  const active=d.status==='drawing';
+  stage.style.display=active?'flex':'none';
+  document.getElementById('boardWrap').style.display=active?'none':'';
+  document.getElementById('cards').style.display=active?'none':'';
+  document.getElementById('bottom').style.display=active?'none':'';
+  document.getElementById('gamePanel').style.display=active?'none':(d.status==='finished'?'block':'none');
+  if(!active)return;
+  const drawn=(d.drawn||[]).map(Number);
+  const last=drawn.length?drawn[drawn.length-1]:null;
+  document.getElementById('livePrize').textContent=Number(d.prize_pool_etb||0).toFixed(0)+' ETB';
+  document.getElementById('liveBalls').textContent=drawn.length+'/75';
+  document.getElementById('livePlayers').textContent=Number(d.player_count||0);
+  document.getElementById('liveCurrent').textContent=last?(bingoLetter(last)+'-'+last):'WAIT';
+  const board=document.getElementById('ballBoard');
+  board.innerHTML='';
+  ['B','I','N','G','O'].forEach(letter=>{const el=document.createElement('div');el.className='ballCell head';el.textContent=letter;board.appendChild(el);});
+  for(let row=0;row<15;row++)for(let col=0;col<5;col++){
+    const n=col*15+row+1;const el=document.createElement('div');
+    el.className='ballCell'+(drawn.includes(n)?' called':'')+(last===n?' latest':'');
+    el.textContent=n;board.appendChild(el);
+  }
+  document.getElementById('liveCards').innerHTML=cardsBox.innerHTML;
+}
+
 /* LOAD DATA FROM BACKEND */
 
 async function load(){
@@ -1063,6 +1132,7 @@ async function load(){
     renderMyCards(d);
 
     renderGame(d);
+    renderLiveGame(d);
 
     const signature=JSON.stringify([
 
