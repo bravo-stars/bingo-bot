@@ -417,6 +417,7 @@ async def ticket_status(request):
     with db() as con:
         wallet = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
     balance_etb = (wallet["balance_cents"] if wallet else 0) / 100
+    logger.info("VIP balance lookup: telegram_user_id=%s balance_etb=%.2f", uid, balance_etb)
     return web.json_response({
         "round_id": round_info["id"],
         "status": round_info["status"],
