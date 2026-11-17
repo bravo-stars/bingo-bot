@@ -678,7 +678,7 @@ function renderGame(d){
       winnerDetails.textContent=winners.map(w=>(w.user_name||('Player '+w.user_id))+' · Cartela '+w.ticket_no+' · '+(Number(w.prize_cents||0)/100).toFixed(2)+' ETB').join(' | ');
       document.getElementById('winnerTitle').textContent=mine?'🎉 YOU WON!':'🏆 BINGO!';
       document.getElementById('winnerName').textContent=d.winner_name||first.user_name||('Player '+first.user_id);
-      document.getElementById('winnerPrize').textContent=prize.toFixed(2)+' ETB';
+      document.getElementById('winnerPrize').textContent=Number(d.prize_etb||0).toFixed(2)+' ETB';
       const cardBox=document.getElementById('winnerCard');
       cardBox.innerHTML='';
       if(Array.isArray(d.winner_card)){
