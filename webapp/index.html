@@ -441,7 +441,7 @@ body{
 .ballCell.latest{background:#facc15!important;color:#172033;border:2px solid #b45309;}
 #liveRight{position:relative;min-height:0;overflow-y:auto;padding-top:52px;}
 #liveCurrent{position:absolute;z-index:2;top:0;left:50%;transform:translateX(-50%);width:112px;height:112px;border-radius:50%;border:6px solid #fff;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:29px;font-weight:900;box-shadow:0 4px 12px #0003;}
-#liveCards{padding-top:8px;}
+#liveCards{padding-top:8px;display:flex;flex-direction:column;gap:8px;}#liveCards:before{content:'YOUR CARTELAS';display:block;text-align:center;background:#344256;color:#fff;border-radius:9px;padding:7px 5px;font-size:11px;font-weight:900;letter-spacing:1px;margin:0 0 2px;}#liveCards .card{order:1;}
 #liveCards .card{margin:8px 0 14px;background:#f1f5f9;border:2px solid #cbd5e1;border-radius:14px;padding:8px;}
 #liveCards .card h3{font-size:12px;}
 #liveCards .card table{font-size:clamp(10px,2.6vw,14px);border-spacing:3px;border-collapse:separate;}
@@ -1122,7 +1122,17 @@ function renderLiveGame(d){
     el.className='ballCell'+(drawn.includes(n)?' called':'')+(last===n?' latest':'');
     el.textContent=n;board.appendChild(el);
   }
-  document.getElementById('liveCards').innerHTML=cardsBox.innerHTML;
+  const liveCards=document.getElementById('liveCards');
+  liveCards.innerHTML='';
+  // Put this player's purchased Cartelas at the top of the live screen.
+  const ownCards=cardsBox.querySelectorAll('.card.mine');
+  ownCards.forEach(card=>liveCards.appendChild(card.cloneNode(true)));
+  if(!ownCards.length){
+    const empty=document.createElement('div');
+    empty.className='empty-cards';
+    empty.textContent='No Cartelas purchased in this round.';
+    liveCards.appendChild(empty);
+  }
 }
 
 /* LOAD DATA FROM BACKEND */
