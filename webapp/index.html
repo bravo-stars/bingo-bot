@@ -676,7 +676,7 @@ body,#app{background:#eef2f8;color:#263447}
 
     <div id="winnerPrize">0.00 ETB</div>
 
-    <div style="font-size:11px;letter-spacing:2px;color:#64748b;font-weight:900">
+    <div class="prize-caption" style="font-size:11px;letter-spacing:2px;color:#64748b;font-weight:900">
       TOTAL PRIZE
     </div>
 
@@ -1021,9 +1021,10 @@ function renderGame(d){
 
       const myId=Number(tg?.initDataUnsafe?.user?.id);
 
-      const mine=winners.some(
+      const myWinningEntry=winners.find(
         w=>Number(w.user_id)===myId
       );
+      const mine=Boolean(myWinningEntry);
 
       const first=winners[0];
 
@@ -1047,8 +1048,17 @@ function renderGame(d){
         first.user_name||
         ('Player '+first.user_id);
 
+      const displayedPrize=mine
+        ? Number(myWinningEntry.prize_cents||0)/100
+        : Number(d.prize_etb||0);
       document.getElementById('winnerPrize').textContent=
-        Number(d.prize_etb||0).toFixed(2)+' ETB';
+        displayedPrize.toFixed(2)+' ETB';
+      const prizeCaption=document.querySelector('#winnerBox .prize-caption');
+      if(prizeCaption){
+        prizeCaption.textContent=mine
+          ? 'YOUR PRIZE · ADDED TO BALANCE'
+          : 'TOTAL WINNER PRIZE';
+      }
 
       const cardBox=document.getElementById('winnerCard');
 
