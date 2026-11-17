@@ -4,17 +4,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>GoodBingo - VIP Room</title>
+<title>BravoBingo - VIP Room</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
 :root{
   --ink:#253247;
   --muted:#718096;
-  --panel:#dce4ee;
-  --line:#c5cfdd;
+  --panel:#e7edf5;
+  --line:#cbd5e1;
   --white:#fff;
 }
+
 *{box-sizing:border-box}
 
 html,body{
@@ -38,13 +39,13 @@ body{
   margin:auto;
 }
 
-/* TOP STATUS */
+/* TOP BAR */
 
 .topbar{
   display:grid;
   grid-template-columns:1.08fr 1fr 1fr 1.08fr;
   gap:9px;
-  padding:24px 25px 12px;
+  padding:16px 14px 12px;
   background:#e5ebf3;
   z-index:3;
   flex-shrink:0;
@@ -59,9 +60,8 @@ body{
   justify-content:center;
   background:#344256;
   color:#fff;
-  box-shadow:
-    0 5px 0 rgba(24,39,58,.12),
-    0 8px 14px rgba(30,41,59,.12);
+  box-shadow:0 5px 0 rgba(24,39,58,.12),
+             0 8px 14px rgba(30,41,59,.12);
   font-weight:800;
 }
 
@@ -107,7 +107,7 @@ body{
   font-size:16px;
 }
 
-/* GAME AREA */
+/* GAME PANEL */
 
 #gamePanel{
   display:none;
@@ -279,7 +279,7 @@ body{
   overflow-y:auto;
   overscroll-behavior:contain;
   margin:5px 26px 0;
-  padding:26px 17px 22px;
+  padding:18px 17px 22px;
   border:2px solid #aab8ca;
   border-radius:62px 62px 0 0;
   background:#dce4ee;
@@ -291,32 +291,33 @@ body{
 #grid{
   display:grid;
   grid-template-columns:repeat(8,minmax(0,1fr));
-  gap:20px 20px;
+  gap:14px 12px;
 }
 
-/* NORMAL CARTELA */
+/* FREE CARTELA - WHITE */
 
 .ticket{
   min-width:0;
   aspect-ratio:1/1;
-  border:2px solid #c5cfdd;
+  border:2px solid #fff;
   border-radius:15px;
-  background:#d6deea;
-  color:#aab5c4;
+  background:#fff;
+  color:#253247;
   font-size:clamp(15px,3.5vw,25px);
   font-weight:800;
-  box-shadow:0 2px 4px rgba(30,41,59,.08);
+  box-shadow:0 3px 8px rgba(30,41,59,.15);
   padding:0;
   -webkit-tap-highlight-color:transparent;
 }
 
-/* SOLD CARTELA */
+/* SOLD CARTELA - GRAY */
 
 .ticket.taken{
   background:#d6deea;
   color:#aab5c4;
   border:2px solid #c5cfdd;
   box-shadow:0 2px 4px rgba(30,41,59,.08);
+  font-size:clamp(11px,2.7vw,18px);
 }
 
 /* OWNED CARTELA */
@@ -325,16 +326,16 @@ body{
   background:#fff;
   color:#202b3a;
   border:2px solid #fff;
-  box-shadow:0 3px 8px rgba(30,41,59,.13);
+  box-shadow:0 3px 8px rgba(30,41,59,.15);
 }
 
 /* SELECTED CARTELA */
 
 .ticket.selected{
   background:#fff;
-  color:#202b3a;
+  color:#253247;
   border:2px solid #fff;
-  box-shadow:0 3px 8px rgba(30,41,59,.13);
+  box-shadow:0 3px 8px rgba(30,41,59,.15);
 }
 
 .ticket:disabled{
@@ -342,9 +343,7 @@ body{
   opacity:1;
 }
 
-/* HIDE PRIVATE CARD LIST
-   Keep private card data handling in JavaScript.
-*/
+/* HIDE CARD LIST */
 
 #cards{
   display:none !important;
@@ -364,7 +363,7 @@ body{
 }
 
 .slot{
-  height:clamp(140px,18vh,270px);
+  height:140px;
   border:3px dashed #aab7c7;
   border-radius:24px;
   background:#f1f4f8;
@@ -376,7 +375,7 @@ body{
   font-weight:800;
   letter-spacing:1px;
   text-align:center;
-  gap:18px;
+  gap:12px;
 }
 
 .slot .plus{
@@ -431,7 +430,7 @@ body{
 
   .topbar{
     gap:6px;
-    padding:16px 9px 9px;
+    padding:12px 9px 9px;
   }
 
   .stat{
@@ -451,11 +450,11 @@ body{
   #boardWrap{
     margin-left:12px;
     margin-right:12px;
-    padding:18px 10px;
+    padding:14px 10px;
   }
 
   #grid{
-    gap:12px 7px;
+    gap:9px 7px;
   }
 
   .ticket{
@@ -469,7 +468,7 @@ body{
   }
 
   .slot{
-    height:clamp(120px,17vh,230px);
+    height:120px;
   }
 }
 </style>
@@ -479,77 +478,79 @@ body{
 
 <div id="app">
 
-<header class="topbar">
+  <header class="topbar">
 
-  <div class="stat room">
-    <small>ROOM</small>
-    <strong>VIP 💰💰</strong>
+    <div class="stat room">
+      <small>ROOM</small>
+      <strong>VIP 💰💰</strong>
+    </div>
+
+    <div class="stat">
+      <small>SOLD</small>
+      <strong id="sold">0</strong>
+    </div>
+
+    <div class="stat">
+      <small>TIME</small>
+      <strong id="timer">30s</strong>
+    </div>
+
+    <div class="stat balance">
+      <small>BALANCE</small>
+      <strong id="balance">0.00 ETB</strong>
+    </div>
+
+  </header>
+
+  <section id="gamePanel">
+
+    <div id="gameStatus">Connecting to game...</div>
+
+    <div id="currentNumber" class="empty">WAIT</div>
+
+    <div id="winnerDetails"></div>
+
+    <div id="calledNumbers"></div>
+
+    <div class="hint">
+      VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins
+    </div>
+
+  </section>
+
+  <main id="boardWrap">
+    <div id="grid"></div>
+  </main>
+
+  <div id="cards">
+    <div class="empty-cards">
+      Your Cartelas will appear here after purchase.
+    </div>
   </div>
 
-  <div class="stat">
-    <small>SOLD</small>
-    <strong id="sold">0</strong>
-  </div>
+  <section id="bottom">
 
-  <div class="stat">
-    <small>TIME</small>
-    <strong id="timer">30s</strong>
-  </div>
+    <div class="slot" id="slot1">
+      <div class="plus">+</div>
+      <div class="slotname">SLOT 1 EMPTY</div>
+    </div>
 
-  <div class="stat balance">
-    <small>BALANCE</small>
-    <strong id="balance">0.00 ETB</strong>
-  </div>
+    <div class="slot" id="slot2">
+      <div class="plus">+</div>
+      <div class="slotname">SLOT 2 EMPTY</div>
+    </div>
 
-</header>
+    <button id="confirm" disabled>
+      CONFIRM CARTELA
+    </button>
 
-<section id="gamePanel">
+    <div id="message"></div>
 
-  <div id="gameStatus">Connecting to game...</div>
+  </section>
 
-  <div id="currentNumber" class="empty">WAIT</div>
-
-  <div id="winnerDetails"></div>
-
-  <div id="calledNumbers"></div>
-
-  <div class="hint">
-    VIP ROOM · Cartela 10 ETB · Row, column, diagonal, or 4 corners wins
-  </div>
-
-</section>
-
-<main id="boardWrap">
-  <div id="grid"></div>
-</main>
-
-<div id="cards">
-  <div class="empty-cards">
-    Your Cartelas will appear here after purchase.
-  </div>
 </div>
 
-<section id="bottom">
-
-  <div class="slot" id="slot1">
-    <div class="plus">+</div>
-    <div class="slotname">SLOT 1 EMPTY</div>
-  </div>
-
-  <div class="slot" id="slot2">
-    <div class="plus">+</div>
-    <div class="slotname">SLOT 2 EMPTY</div>
-  </div>
-
-  <button id="confirm" disabled>
-    CONFIRM CARTELA
-  </button>
-
-  <div id="message"></div>
-
-</section>
-
-</div>
+<!-- WINNER MODAL -->
 
 <div id="winnerModal" role="dialog" aria-modal="true" aria-label="Round winner">
 
@@ -617,6 +618,8 @@ let lastGridSignature='';
 let timerTarget=null;
 let winnerModalRound=null;
 
+/* TIMER */
+
 function tickTimer(){
 
   if(timerTarget!==null){
@@ -629,6 +632,8 @@ function tickTimer(){
     timer.textContent=left+'s';
   }
 }
+
+/* UPDATE SLOTS */
 
 function updateSlots(){
 
@@ -654,6 +659,8 @@ function updateSlots(){
     localSelections.size===0
   );
 }
+
+/* RENDER 600 CARTELAS */
 
 function render(){
 
@@ -788,6 +795,8 @@ function showCard(no,rows,drawn){
 
   cardsBox.appendChild(box);
 }
+
+/* DISPLAY MY CARDS */
 
 function renderMyCards(d){
 
@@ -984,7 +993,7 @@ function renderGame(d){
   });
 }
 
-/* LOAD GAME DATA */
+/* LOAD DATA FROM BACKEND */
 
 async function load(){
 
