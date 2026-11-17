@@ -697,6 +697,7 @@ async function load(){
     }
 
     const d=await r.json();
+d.status=String(d.status||'').toLowerCase().trim();
 
     if(lastRound!==d.round_id){
       lastRound=d.round_id;
