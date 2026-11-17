@@ -785,6 +785,18 @@ function tickTimer(){
     );
 
     timer.textContent=left+'s';
+
+    // Lock selection during the final two seconds of the window.
+    if(game && game.status==='open'){
+      const locked=(timerTarget-Date.now()/1000)<=2;
+      grid.querySelectorAll('.ticket').forEach((ticket)=>{
+        if(!ticket.classList.contains('taken') &&
+           !ticket.classList.contains('owned')){
+          ticket.disabled=locked;
+        }
+      });
+      if(locked) confirmBtn.disabled=true;
+    }
   }
 }
 
@@ -878,7 +890,8 @@ function render(){
     b.disabled=(
       isTaken ||
       !game ||
-      game.status!=='open'
+      game.status!=='open' ||
+      (Number(game.closes_at||0)-Date.now()/1000)<=2
     );
 
     b.onclick=()=>{
