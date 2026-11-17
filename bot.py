@@ -425,8 +425,11 @@ async def ticket_status(request):
             (uid,)
         ).fetchone()
 
-    # All sold ticket numbers.
+    # All sold ticket numbers and live round totals.
     claimed = [r["ticket_no"] for r in all_rows]
+    player_count = len({r["user_id"] for r in all_rows})
+    # The prize pool is 80% of each 10 ETB Cartela sale.
+    prize_pool_etb = (len(all_rows) * 800) / 100
 
     # Only this user's tickets.
     mine_rows = [
@@ -477,6 +480,8 @@ async def ticket_status(request):
         "prize_etb": (full_round["prize_cents"] or 0) / 100,
         "house_etb": (full_round["house_cents"] or 0) / 100,
         "claimed": claimed,
+        "player_count": player_count,
+        "prize_pool_etb": prize_pool_etb,
         "mine": mine,
         "balance_etb": balance_etb,
         "cards": cards
