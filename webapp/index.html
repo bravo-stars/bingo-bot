@@ -437,8 +437,14 @@ body{
 .ballCell{min-width:0;min-height:26px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#182538;font-weight:900;font-size:clamp(11px,2.8vw,17px);display:flex;align-items:center;justify-content:center;}
 .ballCell.head{color:#fff;font-style:italic;font-size:clamp(15px,3.5vw,21px);}
 .ballCell.head:nth-child(5n+1){background:#2563eb}.ballCell.head:nth-child(5n+2){background:#dc2626}.ballCell.head:nth-child(5n+3){background:#eab308}.ballCell.head:nth-child(5n+4){background:#16a34a}.ballCell.head:nth-child(5n){background:#9333ea}
-.ballCell.called{background:#16a34a!important;color:#fff;border-color:#15803d;}
-.ballCell.latest{background:#facc15!important;color:#172033;border:2px solid #b45309;}
+.ballCell.called{background:#facc15!important;color:#263447;border-color:#eab308;}
+.ballCell.latest{background:#16a34a!important;color:#fff;border:2px solid #15803d;}
+#liveCards .card h3,#liveCards .card .card-owner{display:none;}
+#liveCards .card-bingo-footer{display:flex;align-items:center;justify-content:center;position:relative;margin:8px -8px -8px;padding:7px 10px;background:#2563eb;color:#fff;border-radius:0 0 12px 12px;min-height:48px;}
+#liveCards .card-bingo-footer strong{font-size:clamp(22px,6vw,34px);font-style:italic;font-weight:1000;letter-spacing:-1px;}
+#liveCards .card-bingo-footer span{position:absolute;right:10px;bottom:8px;font-size:10px;font-weight:900;color:#dbeafe;}
+#liveCards .card td.free{background:#16a34a;color:#2563eb;font-size:22px;}
+#liveCards .card td.marked{background:#16a34a!important;color:#fff!important;}
 #liveRight{position:relative;min-height:0;overflow-y:auto;padding-top:52px;}
 #liveCurrent{position:absolute;z-index:2;top:0;left:50%;transform:translateX(-50%);width:112px;height:112px;border-radius:50%;border:6px solid #fff;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:29px;font-weight:900;box-shadow:0 4px 12px #0003;}
 #liveCards{padding-top:8px;display:flex;flex-direction:column;gap:8px;}#liveCards:before{content:'YOUR CARTELAS';display:block;text-align:center;background:#344256;color:#fff;border-radius:9px;padding:7px 5px;font-size:11px;font-weight:900;letter-spacing:1px;margin:0 0 2px;}#liveCards .card{order:1;}
@@ -540,8 +546,9 @@ body,#app{background:#eef2f8;color:#263447}
 .ballCell.head:nth-child(5n+3){background:#eab308;color:#422006}
 .ballCell.head:nth-child(5n+4){background:#16a34a}
 .ballCell.head:nth-child(5n){background:#9333ea}
-.ballCell.called{background:#16a34a!important;color:#fff;border-color:#15803d}
+.ballCell.called{background:#facc15!important;color:#263447;border-color:#eab308}
 .ballCell.latest{background:#16a34a!important;color:#fff;border:2px solid #15803d}
+#liveCards .card td.free{background:#16a34a;color:#2563eb}
 #liveCurrent{background:#2563eb;border-color:#fff;color:#fff}
 #liveCards .card{background:#fff;border-color:#cbd5e1}
 #liveCards .card th{color:#fff}
@@ -882,10 +889,12 @@ function showCard(no,rows,drawn){
 
       const td=document.createElement('td');
 
-      td.textContent=x;
-
-      if(x==='FREE'||called.has(Number(x))){
-        td.className='marked';
+      if(x==='FREE'){
+        td.textContent='★';
+        td.className='free';
+      }else{
+        td.textContent=x;
+        if(called.has(Number(x))) td.className='marked';
       }
 
       tr.appendChild(td);
@@ -895,6 +904,15 @@ function showCard(no,rows,drawn){
   }
 
   box.appendChild(t);
+
+  const bingoFooter=document.createElement('div');
+  bingoFooter.className='card-bingo-footer';
+  const bingoLabel=document.createElement('strong');
+  bingoLabel.textContent='BINGO!';
+  const ticketLabel=document.createElement('span');
+  ticketLabel.textContent='#'+no;
+  bingoFooter.append(bingoLabel,ticketLabel);
+  box.appendChild(bingoFooter);
 
   cardsBox.appendChild(box);
 }
