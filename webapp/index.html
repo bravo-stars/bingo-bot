@@ -349,9 +349,49 @@ body{
   display:none !important;
 }
 
-/* BOTTOM SLOTS */
-
+/* BOTTOM SLOTS — compact Cartela previews like the reference screenshot */
 #bottom{
+  flex-shrink:0;
+  background:#fff;
+  padding:10px 9% 14px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  z-index:4;
+  box-shadow:0 -5px 16px rgba(30,41,59,.06);
+}
+.slot{
+  height:220px;
+  min-width:0;
+  overflow:hidden;
+  border:2px solid #cbd5e1;
+  border-radius:20px;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  color:#263447;
+  font-weight:800;
+  letter-spacing:0;
+  text-align:center;
+  gap:5px;
+  padding:8px;
+}
+.slot .plus{font-size:36px;line-height:40px;color:#bdc8d6;margin:auto 0 0}
+.slot .slotname{font-size:11px;color:#8290a3}
+.slot.filled{border-style:solid;border-color:#cbd5e1;background:#fff;color:#263447}
+.slot-card-title{font-size:12px;font-weight:900;color:#2563eb;text-align:left}
+.slot-card-grid{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-size:clamp(10px,2.8vw,15px)}
+.slot-card-grid th{background:#2563eb;color:#fff;border-radius:3px;padding:3px 0}
+.slot-card-grid th:nth-child(2){background:#dc2626}
+.slot-card-grid th:nth-child(3){background:#eab308;color:#422006}
+.slot-card-grid th:nth-child(4){background:#16a34a}
+.slot-card-grid th:nth-child(5){background:#9333ea}
+.slot-card-grid td{background:#f1f5f9;border:1px solid #dbe3ed;border-radius:3px;padding:5px 0;font-weight:900}
+.slot-card-grid td.free{background:#facc15;color:#422006}
+.slot-preview{margin:auto 0;font-size:12px;color:#718096}
+
   flex-shrink:0;
   background:#fff;
   padding:14px 9% 20px;
@@ -748,19 +788,52 @@ function tickTimer(){
 function updateSlots(){
 
   const chosen=[...selected].sort((a,b)=>a-b);
+  const myCards=(game&&game.cards)||{};
 
   [1,2].forEach((i)=>{
-
     const el=document.getElementById('slot'+i);
     const n=chosen[i-1];
-
     el.classList.toggle('filled',!!n);
+    el.innerHTML='';
 
-    el.innerHTML=n
-      ? '<div class="plus">🎟 '+n+'</div><div class="slotname">'+
-        (mineTickets.has(n)?'OWNED CARTELA':'CARTELA '+n)+
-        '</div>'
-      : '<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';
+    if(!n){
+      el.innerHTML='<div class="plus">+</div><div class="slotname">SLOT '+i+' EMPTY</div>';
+      return;
+    }
+
+    const title=document.createElement('div');
+    title.className='slot-card-title';
+    title.textContent='#'+n+(mineTickets.has(n)?' · OWNED':' · SELECTED');
+    el.appendChild(title);
+
+    const rows=myCards[String(n)];
+    if(Array.isArray(rows)){
+      const table=document.createElement('table');
+      table.className='slot-card-grid';
+      const head=document.createElement('tr');
+      ['B','I','N','G','O'].forEach((letter)=>{
+        const th=document.createElement('th');
+        th.textContent=letter;
+        head.appendChild(th);
+      });
+      table.appendChild(head);
+      rows.forEach((row)=>{
+        const tr=document.createElement('tr');
+        row.forEach((value)=>{
+          const td=document.createElement('td');
+          td.textContent=value==='FREE'?'★':value;
+          if(value==='FREE')td.className='free';
+          tr.appendChild(td);
+        });
+        table.appendChild(tr);
+      });
+      el.appendChild(table);
+    }else{
+      const preview=document.createElement('div');
+      preview.className='slot-preview';
+      preview.textContent='Cartela '+n+' · Confirm to buy';
+      el.appendChild(preview);
+    }
   });
 
   confirmBtn.disabled=(
