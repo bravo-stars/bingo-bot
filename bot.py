@@ -307,7 +307,12 @@ async def game_loop():
                 elif row["status"] == "open" and now >= row["closes_at"]:
                     count = con.execute("SELECT COUNT(*) FROM round_tickets WHERE round_id=?", (row["id"],)).fetchone()[0]
                     if count == 0:
-                        con.execute("UPDATE game_rounds SET status='finished',finished_at=? WHERE id=?", (now, row["id"]))
+                        # No Cartelas were sold: skip the empty round and open
+                        # the next 30-second selection window immediately.
+                        con.execute(
+                            "INSERT INTO game_rounds(status,opens_at,closes_at,created_at) VALUES('open',?,?,?)",
+                            (now, now + 30, datetime.now(timezone.utc).isoformat())
+                        )
                     else:
                         order = random.sample(range(1, 76), 75)
                         con.execute(
@@ -505,7 +510,7 @@ async def select_tickets(request):
         con.execute("BEGIN IMMEDIATE")
         round_row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
         now = time.time()
-        if round_row is None or round_row["status"] != "open" or now >= round_row["closes_at"]:
+        if round_row is None or round_row["status"] != "open" or now >= (round_row["closes_at"] - 2):
             raise web.HTTPConflict(text="Ticket selection is closed. Wait for the next round.")
         round_id = round_row["id"]
         existing = {r["ticket_no"] for r in con.execute(
