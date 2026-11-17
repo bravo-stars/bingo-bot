@@ -366,8 +366,8 @@ body{
   box-shadow:0 -5px 16px rgba(30,41,59,.06);
 }
 .slot{
-  height:220px;
-  min-height:220px;
+  height:130px;
+  min-height:130px;
   min-width:0;
   overflow:hidden;
   border:2px solid #cbd5e1;
@@ -382,7 +382,7 @@ body{
   letter-spacing:0;
   text-align:center;
   gap:5px;
-  padding:8px;
+  padding:6px;
 }
 .slot .plus{font-size:36px;line-height:40px;color:#bdc8d6;margin:auto 0 0}
 .slot .slotname{font-size:11px;color:#8290a3}
@@ -390,11 +390,12 @@ body{
 .slot-card-title{font-size:12px;font-weight:900;color:#2563eb;text-align:left}
 .slot-card-grid{
   width:100%;
-  height:calc(100% - 20px);
+  height:auto;
+  min-height:0;
   table-layout:fixed;
   border-collapse:separate;
   border-spacing:2px;
-  font-size:clamp(10px,2.8vw,15px);
+  font-size:clamp(9px,2.7vw,13px);
   flex:1;
 }
 .slot-card-grid tr{height:16.66%}
@@ -415,54 +416,6 @@ body{
 .slot-card-grid td.free{background:#facc15;color:#422006}
 .slot-preview{margin:auto 0;font-size:12px;color:#718096}
 
-  flex-shrink:0;
-  background:#fff;
-  padding:14px 9% 20px;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:22px;
-  z-index:4;
-  box-shadow:0 -5px 16px rgba(30,41,59,.06);
-}
-
-.slot{
-  height:140px;
-  border:3px dashed #aab7c7;
-  border-radius:24px;
-  background:#f1f4f8;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  color:#8290a3;
-  font-weight:800;
-  letter-spacing:1px;
-  text-align:center;
-  gap:12px;
-}
-
-.slot .plus{
-  font-size:43px;
-  line-height:35px;
-  color:#bdc8d6;
-}
-
-.slot .slotname{
-  font-size:12px;
-}
-
-.slot.filled{
-  border-style:solid;
-  border-color:#e5b523;
-  background:#fff8df;
-  color:#604b0b;
-}
-
-.slot.filled .plus{
-  font-size:24px;
-  line-height:24px;
-  color:#bd8a00;
-}
 
 #confirm{
   grid-column:1/-1;
@@ -562,17 +515,21 @@ body{
   }
 
   .slot{
-    height:190px;
+    height:130px;
+    min-height:130px;
   }
   .slot-card-grid{
-    font-size:clamp(10px,2.6vw,13px);
-    border-spacing:2px;
+    font-size:clamp(9px,2.5vw,12px);
+    border-spacing:1px;
   }
   .slot-card-grid td{
-    padding:3px 0;
+    padding:1px 0;
+    line-height:1.05;
+    white-space:nowrap;
   }
   .slot-card-grid th{
-    padding:2px 0;
+    padding:1px 0;
+    line-height:1.05;
   }
 }
 
