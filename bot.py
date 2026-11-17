@@ -214,7 +214,7 @@ def verify_init_data(init_data):
     if not received:
         raise web.HTTPUnauthorized(text="Telegram verification missing.")
     check = "\n".join(f"{k}={v}" for k, v in sorted(values.items()))
-    secret = hmac.new(TOKEN.encode(), b"WebAppData", hashlib.sha256).digest()
+    secret = hmac.new(b"WebAppData", TOKEN.encode(), hashlib.sha256).digest()
     expected = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, received):
         raise web.HTTPUnauthorized(text="Telegram verification failed.")
