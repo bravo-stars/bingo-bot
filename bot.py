@@ -1007,8 +1007,8 @@ async def approve_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (amount_cents, datetime.now(timezone.utc).isoformat(), request_id)
         )
         con.execute(
-            "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET balance_cents=balance_cents+excluded.balance_cents",
-            (uid, amount_cents)
+            "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET balance_cents=wallets.balance_cents+EXCLUDED.balance_cents",
+(uid, amount_cents)
         )
         con.execute(
             "INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)",
