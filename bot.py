@@ -341,7 +341,7 @@ async def game_loop():
                                 winner["prize_cents"] = share
                                 con.execute(
                                     "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) "
-                                    "ON CONFLICT(user_id) DO UPDATE SET balance_cents=balance_cents+excluded.balance_cents",
+                                    "ON CONFLICT(user_id) DO UPDATE SET balance_cents=wallets.balance_cents+EXCLUDED.balance_cents",
                                     (winner["user_id"], share)
                                 )
                                 if share:
@@ -353,7 +353,7 @@ async def game_loop():
                                     )
                             con.execute(
                                 "INSERT INTO wallets(user_id,balance_cents) VALUES(?,?) "
-                                "ON CONFLICT(user_id) DO UPDATE SET balance_cents=balance_cents+excluded.balance_cents",
+                                "ON CONFLICT(user_id) DO UPDATE SET balance_cents=wallets.balance_cents+EXCLUDED.balance_cents",
                                 (ADMIN_ID, house_cents)
                             )
                             if house_cents:
