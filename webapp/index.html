@@ -427,7 +427,7 @@ body{
 /* MOBILE */
 
 /* LIVE BINGO SCREEN — shown after the 30-second selection period */
-#liveGameScreen{display:none;flex:1;min-height:0;overflow:hidden;background:#eef2f8;padding:8px;}
+#liveGameScreen{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;background:#eef2f8;padding:8px;}
 #liveSummary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#253247;color:#fff;padding:8px;border-radius:12px;margin-bottom:8px;text-align:center;}
 #liveSummary .liveStat{min-width:0;font-size:11px;font-weight:800;color:#b9c6d8;}
 #liveSummary strong{display:block;font-size:20px;color:#fff;margin-top:3px;}
@@ -1040,6 +1040,7 @@ function renderLiveGame(d){
   const stage=document.getElementById('liveGameScreen');
   const active=d.status==='drawing';
   stage.style.display=active?'flex':'none';
+  document.querySelector('.topbar').style.display=active?'none':'';
   document.getElementById('boardWrap').style.display=active?'none':'';
   document.getElementById('cards').style.display=active?'none':'';
   document.getElementById('bottom').style.display=active?'none':'';
