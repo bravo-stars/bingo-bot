@@ -400,6 +400,7 @@ async def health(request):
     return web.json_response({"ok": True, "service": "bingo-bot"})
 
 
+
 async def ticket_status(request):
     uid = request_user(request)
     round_info = ensure_round()
@@ -410,8 +411,9 @@ async def ticket_status(request):
             (round_info["id"],)
         ).fetchone()
 
+        # Get ticket numbers for SOLD display.
         all_rows = con.execute(
-            """SELECT ticket_no, user_id, user_name, card_json
+            """SELECT ticket_no, user_id, card_json
                FROM round_tickets
                WHERE round_id=?
                ORDER BY ticket_no""",
@@ -423,24 +425,21 @@ async def ticket_status(request):
             (uid,)
         ).fetchone()
 
+    # All sold ticket numbers.
     claimed = [r["ticket_no"] for r in all_rows]
-    mine_rows = [r for r in all_rows if r["user_id"] == uid]
+
+    # Only this user's tickets.
+    mine_rows = [
+        r for r in all_rows
+        if r["user_id"] == uid
+    ]
 
     mine = [r["ticket_no"] for r in mine_rows]
 
+    # Only this user's private 5x5 cards.
     cards = {
         str(r["ticket_no"]): json.loads(r["card_json"])
         for r in mine_rows
-    }
-
-    public_cards = {
-        str(r["ticket_no"]): {
-            "grid": json.loads(r["card_json"]),
-            "user_id": r["user_id"],
-            "user_name": r["user_name"],
-            "is_mine": r["user_id"] == uid
-        }
-        for r in all_rows
     }
 
     balance_etb = (
@@ -461,9 +460,10 @@ async def ticket_status(request):
         "claimed": claimed,
         "mine": mine,
         "balance_etb": balance_etb,
-        "cards": cards,
-        "public_cards": public_cards
+        "cards": cards
     })
+
+        
 
 
 
