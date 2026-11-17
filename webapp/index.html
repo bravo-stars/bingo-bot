@@ -332,10 +332,15 @@ body{
 /* SELECTED CARTELA */
 
 .ticket.selected{
-  background:#fff;
-  color:#253247;
-  border:2px solid #fff;
-  box-shadow:0 3px 8px rgba(30,41,59,.15);
+  background:#16a34a !important;
+  color:#fff !important;
+  border:2px solid #4ade80 !important;
+  box-shadow:0 0 0 3px rgba(22,163,74,.22),0 4px 10px rgba(22,163,74,.28) !important;
+  transform:scale(.96);
+}
+.ticket:not(.taken):not(.owned):active{
+  background:#dbeafe;
+  border-color:#2563eb;
 }
 
 .ticket:disabled{
