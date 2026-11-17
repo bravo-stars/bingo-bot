@@ -403,21 +403,50 @@ async def health(request):
 async def ticket_status(request):
     uid = request_user(request)
     round_info = ensure_round()
+
     with db() as con:
-        full_round = con.execute("SELECT * FROM game_rounds WHERE id=?", (round_info["id"],)).fetchone()
-        claimed = [r["ticket_no"] for r in con.execute(
-            "SELECT ticket_no FROM round_tickets WHERE round_id=? ORDER BY ticket_no", (round_info["id"],)
-        )]
-        mine_rows = con.execute(
-            "SELECT ticket_no,card_json FROM round_tickets WHERE round_id=? AND user_id=? ORDER BY ticket_no",
-            (round_info["id"], uid)
+        full_round = con.execute(
+            "SELECT * FROM game_rounds WHERE id=?",
+            (round_info["id"],)
+        ).fetchone()
+
+        all_rows = con.execute(
+            """SELECT ticket_no, user_id, user_name, card_json
+               FROM round_tickets
+               WHERE round_id=?
+               ORDER BY ticket_no""",
+            (round_info["id"],)
         ).fetchall()
+
+        wallet = con.execute(
+            "SELECT balance_cents FROM wallets WHERE user_id=?",
+            (uid,)
+        ).fetchone()
+
+    claimed = [r["ticket_no"] for r in all_rows]
+    mine_rows = [r for r in all_rows if r["user_id"] == uid]
+
     mine = [r["ticket_no"] for r in mine_rows]
-    cards = {str(r["ticket_no"]): json.loads(r["card_json"]) for r in mine_rows}
-    with db() as con:
-        wallet = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
-    balance_etb = (wallet["balance_cents"] if wallet else 0) / 100
-    logger.info("VIP balance lookup: telegram_user_id=%s balance_etb=%.2f", uid, balance_etb)
+
+    cards = {
+        str(r["ticket_no"]): json.loads(r["card_json"])
+        for r in mine_rows
+    }
+
+    public_cards = {
+        str(r["ticket_no"]): {
+            "grid": json.loads(r["card_json"]),
+            "user_id": r["user_id"],
+            "user_name": r["user_name"],
+            "is_mine": r["user_id"] == uid
+        }
+        for r in all_rows
+    }
+
+    balance_etb = (
+        wallet["balance_cents"] if wallet else 0
+    ) / 100
+
     return web.json_response({
         "round_id": round_info["id"],
         "status": round_info["status"],
@@ -426,14 +455,16 @@ async def ticket_status(request):
         "drawn": json.loads(round_info["drawn_json"]),
         "winner_ticket": round_info["winner_ticket"],
         "winner_user_id": round_info["winner_user_id"],
-        "winners": json.loads(round_info["winners_json"] or "[]"),
+        "winners": json.loads(full_round["winners_json"] or "[]"),
         "prize_etb": (full_round["prize_cents"] or 0) / 100,
         "house_etb": (full_round["house_cents"] or 0) / 100,
         "claimed": claimed,
         "mine": mine,
         "balance_etb": balance_etb,
-        "cards": cards
+        "cards": cards,
+        "public_cards": public_cards
     })
+
 
 
 async def select_tickets(request):
