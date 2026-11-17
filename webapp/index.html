@@ -434,6 +434,7 @@ let lastRound=null;
 let loading=false;
 let lastGridSignature='';
 let timerTarget=null;
+let winnerModalRound=null;
 
 function tickTimer(){
   if(timerTarget!==null){
@@ -696,7 +697,10 @@ function renderGame(d){
         cardBox.appendChild(table);
       }
       document.getElementById('winnerNext').textContent='NEXT ROUND IN 10 SECONDS';
-      document.getElementById('winnerModal').classList.add('show');
+      if(winnerModalRound!==d.round_id){
+        winnerModalRound=d.round_id;
+        document.getElementById('winnerModal').classList.add('show');
+      }
     }else{
       gameStatus.textContent='ROUND '+d.round_id+' · No winner';
       document.getElementById('winnerModal').classList.remove('show');
