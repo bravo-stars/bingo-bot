@@ -970,6 +970,9 @@ function renderGame(d){
 
     timerTarget=Number(d.closes_at);
 
+    // A new ticket-selection round must dismiss the previous winner screen.
+    document.getElementById('winnerModal').classList.remove('show');
+
     document.getElementById('gamePanel').style.display='none';
 
     const left=Math.max(
