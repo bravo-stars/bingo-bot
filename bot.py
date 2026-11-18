@@ -390,7 +390,7 @@ async def game_loop():
                         else:
                             con.execute(
                                 "UPDATE game_rounds SET drawn_json=?,next_draw_at=? WHERE id=?",
-                                (json.dumps(drawn), now + 7, row["id"])
+                                (json.dumps(drawn), now + 5, row["id"])
                             )
                 con.commit()
             except Exception:
