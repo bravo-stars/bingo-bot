@@ -455,6 +455,17 @@ body{
 .ballCell.head:nth-child(5n+1){background:#2563eb}.ballCell.head:nth-child(5n+2){background:#dc2626}.ballCell.head:nth-child(5n+3){background:#eab308}.ballCell.head:nth-child(5n+4){background:#16a34a}.ballCell.head:nth-child(5n){background:#9333ea}
 .ballCell.called{background:#facc15!important;color:#263447;border-color:#eab308;}
 .ballCell.latest{background:#16a34a!important;color:#fff;border:2px solid #15803d;}
+/* Make the newly called Bingo ball stand out without changing the board layout. */
+@keyframes calledBallFlash{
+  0%,100%{transform:scale(1);filter:brightness(1);box-shadow:0 0 0 0 rgba(250,204,21,0);}
+  35%{transform:scale(1.18);filter:brightness(1.55);box-shadow:0 0 0 5px rgba(250,204,21,.55);}
+  70%{transform:scale(1.08);filter:brightness(1.25);box-shadow:0 0 0 2px rgba(250,204,21,.3);}
+}
+.ballCell.latest{animation:calledBallFlash 1s ease-in-out infinite;z-index:1;}
+#liveCurrent{transition:background .2s ease,transform .2s ease;}
+#liveCurrent.flash{animation:calledBallFlash 1s ease-in-out infinite;}
+@media(prefers-reduced-motion:reduce){.ballCell.latest,#liveCurrent.flash{animation:none;}}
+
 #liveCards .card h3,#liveCards .card .card-owner{display:none;}
 #liveCards .card-bingo-footer{display:flex;align-items:center;justify-content:center;position:relative;margin:8px -8px -8px;padding:7px 10px;background:#2563eb;color:#fff;border-radius:0 0 12px 12px;min-height:48px;}
 #liveCards .card-bingo-footer strong{font-size:clamp(22px,6vw,34px);font-style:italic;font-weight:1000;letter-spacing:-1px;}
@@ -1251,7 +1262,9 @@ function renderLiveGame(d){
   document.getElementById('livePrize').textContent=Number(d.prize_pool_etb||0).toFixed(0)+' ETB';
   document.getElementById('liveBalls').textContent=drawn.length+'/75';
   document.getElementById('livePlayers').textContent=Number(d.player_count||0);
-  document.getElementById('liveCurrent').textContent=last?(bingoLetter(last)+'-'+last):'WAIT';
+  const liveCurrent=document.getElementById('liveCurrent');
+  liveCurrent.textContent=last?(bingoLetter(last)+'-'+last):'WAIT';
+  liveCurrent.classList.toggle('flash',Boolean(last));
   const board=document.getElementById('ballBoard');
   board.innerHTML='';
   ['B','I','N','G','O'].forEach(letter=>{const el=document.createElement('div');el.className='ballCell head';el.textContent=letter;board.appendChild(el);});
