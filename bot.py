@@ -425,7 +425,7 @@ async def ticket_status(request):
 
         # Get ticket numbers for SOLD display.
         all_rows = con.execute(
-            """SELECT ticket_no, user_id, card_json
+            """SELECT ticket_no, user_id, user_name, card_json
                FROM round_tickets
                WHERE round_id=?
                ORDER BY ticket_no""",
@@ -461,22 +461,20 @@ async def ticket_status(request):
         wallet["balance_cents"] if wallet else 0
     ) / 100
 
-    # Expose the winning Cartela only after the round is finished.
+    # Expose every winning Cartela only after the round is finished.
     winner_card = None
     winner_name = None
-    if full_round["status"] == "finished" and full_round["winner_ticket"] is not None:
-        winning_row = next(
-            (r for r in all_rows if r["ticket_no"] == full_round["winner_ticket"]),
-            None
-        )
-        if winning_row:
-            winner_card = json.loads(winning_row["card_json"])
-        winner_entry = next(
-            (w for w in json.loads(full_round["winners_json"] or "[]")
-             if w.get("ticket_no") == full_round["winner_ticket"]),
-            None
-        )
-        winner_name = winner_entry.get("user_name") if winner_entry else None
+    winners = json.loads(full_round["winners_json"] or "[]")
+    if full_round["status"] == "finished":
+        cards_by_ticket = {r["ticket_no"]: json.loads(r["card_json"]) for r in all_rows}
+        names_by_ticket = {r["ticket_no"]: r["user_name"] for r in all_rows}
+        for winner in winners:
+            winner["card"] = cards_by_ticket.get(winner["ticket_no"])
+            winner["user_name"] = winner.get("user_name") or names_by_ticket.get(winner["ticket_no"]) or ""
+        if full_round["winner_ticket"] is not None:
+            winner_card = cards_by_ticket.get(full_round["winner_ticket"])
+            first_winner = next((w for w in winners if w.get("ticket_no") == full_round["winner_ticket"]), None)
+            winner_name = first_winner.get("user_name") if first_winner else None
 
     return web.json_response({
         "round_id": round_info["id"],
@@ -487,7 +485,7 @@ async def ticket_status(request):
         "drawn": json.loads(full_round["drawn_json"]),
         "winner_ticket": round_info["winner_ticket"],
         "winner_user_id": round_info["winner_user_id"],
-        "winners": json.loads(full_round["winners_json"] or "[]"),
+        "winners": winners,
         "winner_card": winner_card,
         "winner_name": winner_name,
         "prize_etb": (full_round["prize_cents"] or 0) / 100,
