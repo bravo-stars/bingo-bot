@@ -544,12 +544,28 @@ async def select_tickets(request):
         if len(existing) + len(add) > 2:
             raise web.HTTPBadRequest(text="You can own at most two Cartelas in one round.")
         cost_cents = len(add) * 1000
-        wallet = con.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (uid,)).fetchone()
-        balance_cents = wallet["balance_cents"] if wallet else 0
+        # Lock this user's wallet row so two simultaneous purchases cannot
+        # read the same old balance and race each other.
+        wallet = con.execute(
+            "SELECT balance_cents FROM wallets WHERE user_id=? FOR UPDATE",
+            (uid,)
+        ).fetchone()
+        balance_cents = int(wallet["balance_cents"]) if wallet else 0
         if balance_cents < cost_cents:
             raise web.HTTPPaymentRequired(text=f"Insufficient balance. Each Cartela costs 10 ETB; need {cost_cents/100:.2f} ETB.")
+
+        balance_after_cents = balance_cents
         if cost_cents:
-            con.execute("UPDATE wallets SET balance_cents=balance_cents-? WHERE user_id=?", (cost_cents, uid))
+            # Deduct only if the database still has enough funds, and return
+            # the committed-after-this-update balance for the Mini App.
+            updated_wallet = con.execute(
+                "UPDATE wallets SET balance_cents=balance_cents-? "
+                "WHERE user_id=? AND balance_cents>=? RETURNING balance_cents",
+                (cost_cents, uid, cost_cents)
+            ).fetchone()
+            if not updated_wallet:
+                raise web.HTTPPaymentRequired(text="Wallet balance is not enough. Deposit funds first.")
+            balance_after_cents = int(updated_wallet["balance_cents"])
             con.execute(
                 "INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES(?,?,?,?,?)",
                 (uid, "TICKET", -cost_cents, f"Round {round_id}: {len(add)} Cartela(s)",
@@ -569,7 +585,13 @@ async def select_tickets(request):
         ).fetchall()
         result = {str(r["ticket_no"]): json.loads(r["card_json"]) for r in rows}
         con.commit()
-        return web.json_response({"ok": True, "round_id": round_id, "tickets": result})
+        return web.json_response({
+            "ok": True,
+            "round_id": round_id,
+            "tickets": result,
+            "balance_cents": balance_after_cents,
+            "balance_etb": balance_after_cents / 100
+        })
     except Exception:
         con.rollback()
         raise
