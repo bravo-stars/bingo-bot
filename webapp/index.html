@@ -260,8 +260,9 @@ body{
 #winnerCard td.free{background:#16a34a;border-color:#15803d;color:#fff}
 
 #winnerCard td.free{
-  background:#facc15;
-  color:#422006;
+  background:#16a34a;
+  border-color:#15803d;
+  color:#fff;
 }
 
 #winnerNext{
@@ -428,6 +429,17 @@ body{
 .slot-preview{margin:auto 0;font-size:12px;color:#718096}
 
 
+#autoPick{
+  grid-column:1/-1;
+  border:0;
+  border-radius:12px;
+  padding:11px;
+  background:#2563eb;
+  color:#fff;
+  font-size:14px;
+  font-weight:900;
+}
+#autoPick:disabled{opacity:.45}
 #confirm{
   grid-column:1/-1;
   border:0;
@@ -702,6 +714,8 @@ body,#app{background:#eef2f8;color:#263447}
       <div class="slotname">SLOT 2 EMPTY</div>
     </div>
 
+    <button id="autoPick" type="button">🎲 AUTOMATIC CARTELA</button>
+
     <button id="confirm" disabled>
       CONFIRM CARTELA
     </button>
@@ -754,6 +768,7 @@ const timer=document.getElementById('timer');
 const balance=document.getElementById('balance');
 
 const confirmBtn=document.getElementById('confirm');
+const autoPickBtn=document.getElementById('autoPick');
 const message=document.getElementById('message');
 const cardsBox=document.getElementById('cards');
 
@@ -894,6 +909,11 @@ function updateSlots(){
     !game ||
     game.status!=='open' ||
     localSelections.size===0
+  );
+  autoPickBtn.disabled=(
+    !game ||
+    game.status!=='open' ||
+    mineTickets.size+localSelections.size>=2
   );
 }
 
@@ -1451,6 +1471,31 @@ async function load(){
     loading=false;
   }
 }
+
+/* AUTOMATIC CARTELA PICK — fills the remaining slot(s) with random
+   available numbers. Manual selection remains available on the board. */
+autoPickBtn.onclick=()=>{
+  if(!game || game.status!=='open') return;
+  const remaining=2-mineTickets.size-localSelections.size;
+  if(remaining<=0) return;
+  const available=[];
+  for(let n=1;n<=600;n++){
+    if(!claimed.has(n) && !mineTickets.has(n) && !localSelections.has(n)){
+      available.push(n);
+    }
+  }
+  for(let i=available.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [available[i],available[j]]=[available[j],available[i]];
+  }
+  const picks=available.slice(0,remaining);
+  picks.forEach(n=>{localSelections.add(n);selected.add(n);});
+  message.textContent=picks.length
+    ? '🎲 Automatic Cartela selected: '+picks.join(', ')+'. Press CONFIRM CARTELA to buy.'
+    : 'No available Cartela numbers remain.';
+  render();
+  loadSelectedPreviews();
+};
 
 /* PURCHASE CARTELA */
 
