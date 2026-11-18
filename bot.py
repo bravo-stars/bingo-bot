@@ -259,7 +259,7 @@ def ensure_round():
     with db() as con:
         con.execute("BEGIN IMMEDIATE")
         row = con.execute("SELECT * FROM game_rounds ORDER BY id DESC LIMIT 1").fetchone()
-        if row is None or (row["status"] == "finished" and row["finished_at"] is not None and now >= row["finished_at"] + 10):
+        if row is None or (row["status"] == "finished" and row["finished_at"] is not None and now >= row["finished_at"] + 8):
             cur = con.execute(
                 """INSERT INTO game_rounds(status,opens_at,closes_at,created_at)
                    VALUES('open',?,?,?) RETURNING id""",
@@ -300,7 +300,7 @@ async def game_loop():
                         (now, now + 30, datetime.now(timezone.utc).isoformat())
                     )
                 elif row["status"] == "finished":
-                    if row["finished_at"] is not None and now >= row["finished_at"] + 10:
+                    if row["finished_at"] is not None and now >= row["finished_at"] + 8:
                         con.execute(
                             "INSERT INTO game_rounds(status,opens_at,closes_at,created_at) VALUES('open',?,?,?)",
                             (now, now + 30, datetime.now(timezone.utc).isoformat())
