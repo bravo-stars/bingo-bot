@@ -189,7 +189,9 @@ def init_db():
                 f'ALTER TABLE "{table}" ALTER COLUMN "{column}" TYPE BIGINT'
             )
         # Normalize any legacy open round that was created with an 80-second window.
-        con.execute("""UPDATE game_rounds SET closes_at=opens_at+30
+        con.execute("""UPDATE game_rounds
+                        SET opens_at=EXTRACT(EPOCH FROM NOW()),
+                            closes_at=EXTRACT(EPOCH FROM NOW())+30
                         WHERE status='open' AND closes_at-opens_at>30""")
 
     logger.info("Database initialized")
