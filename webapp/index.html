@@ -1266,42 +1266,55 @@ function renderGame(d){
       if(prizeCaption) prizeCaption.textContent='TOTAL PRIZE POOL';
 
       const cardBox=document.getElementById('winnerCard');
-
       cardBox.innerHTML='';
 
-      const winningTicket=Number(first.ticket_no||d.winner_ticket||0);
-      const winnerRows=d.winner_card || (mine ? (d.cards||{})[String(myWinningEntry.ticket_no)] : null);
-      if(Array.isArray(winnerRows)){
+      // Show every winner and their winning Cartela.
+      winners.forEach((winner)=>{
+        const winnerRows=winner.card || (
+          Number(winner.ticket_no)===Number(d.winner_ticket) ? d.winner_card : null
+        ) || (
+          Number(winner.user_id)===myId ? (d.cards||{})[String(winner.ticket_no)] : null
+        );
+        const section=document.createElement('div');
+        section.className='winner-card-section';
+
         const heading=document.createElement('div');
         heading.className='winner-card-heading';
         const cardNo=document.createElement('span');
-        cardNo.textContent='CARD #'+winningTicket;
+        cardNo.textContent='CARD #'+winner.ticket_no;
         const cardOwner=document.createElement('span');
-        cardOwner.textContent=d.winner_name||first.user_name||'Winner';
+        cardOwner.textContent=winner.user_name||('Player '+winner.user_id);
         heading.append(cardNo,cardOwner);
-        cardBox.appendChild(heading);
+        section.appendChild(heading);
 
-        const winningCells=getWinningCells(winnerRows,drawn);
-        const table=document.createElement('table');
-        winnerRows.forEach((row,r)=>{
-          const tr=document.createElement('tr');
-          row.forEach((value,c)=>{
-            const td=document.createElement('td');
-            td.textContent=value==='FREE'?'★':value;
-            const key=r+','+c;
-            if(value==='FREE' || winningCells.has(key)){
-              td.className='winning';
-            }else if(drawn.includes(Number(value))){
-              td.className='called';
-            }
-            tr.appendChild(td);
+        const prize=document.createElement('div');
+        prize.style.cssText='font-weight:900;color:#15803d;margin:0 0 8px';
+        prize.textContent=(Number(winner.prize_cents||0)/100).toFixed(2)+' ETB';
+        section.appendChild(prize);
+
+        if(Array.isArray(winnerRows)){
+          const winningCells=getWinningCells(winnerRows,drawn);
+          const table=document.createElement('table');
+          winnerRows.forEach((row,r)=>{
+            const tr=document.createElement('tr');
+            row.forEach((value,c)=>{
+              const td=document.createElement('td');
+              td.textContent=value==='FREE'?'★':value;
+              const key=r+','+c;
+              if(value==='FREE' || winningCells.has(key)) td.className='winning';
+              else if(drawn.includes(Number(value))) td.className='called';
+              tr.appendChild(td);
+            });
+            table.appendChild(tr);
           });
-          table.appendChild(tr);
-        });
-        cardBox.appendChild(table);
-      }else{
-        cardBox.textContent='Winner Cartela details are not available.';
-      }
+          section.appendChild(table);
+        }else{
+          const missing=document.createElement('div');
+          missing.textContent='Cartela details unavailable';
+          section.appendChild(missing);
+        }
+        cardBox.appendChild(section);
+      });
 
       const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000));
       document.getElementById('winnerNext').textContent=
