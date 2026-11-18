@@ -765,6 +765,8 @@ let mineTickets=new Set();
 let game=null;
 let lastRound=null;
 let loading=false;
+// Prevent an older in-flight poll from restoring a pre-purchase wallet balance.
+let balanceUpdatedAt=0;
 let lastGridSignature='';
 let timerTarget=null;
 let winnerModalRound=null;
@@ -1293,6 +1295,7 @@ async function load(){
   if(loading)return;
 
   loading=true;
+  const requestStartedAt=Date.now();
 
   try{
 
@@ -1340,8 +1343,10 @@ async function load(){
       (d.mine||[]).map(Number)
     );
 
-    balance.textContent=
-      Number(d.balance_etb||0).toFixed(2)+' ETB';
+    if(requestStartedAt>=balanceUpdatedAt){
+      balance.textContent=
+        Number(d.balance_etb||0).toFixed(2)+' ETB';
+    }
 
     localSelections=new Set(
       [...localSelections].filter(
@@ -1466,6 +1471,12 @@ confirmBtn.onclick=async()=>{
       }
 
       throw Error(detail);
+    }
+
+    const purchaseData=await r.json();
+    if(purchaseData.balance_etb!==undefined && Number.isFinite(Number(purchaseData.balance_etb))){
+      balanceUpdatedAt=Date.now();
+      balance.textContent=Number(purchaseData.balance_etb).toFixed(2)+' ETB';
     }
 
     localSelections.clear();
