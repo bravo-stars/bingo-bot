@@ -318,7 +318,7 @@ async def game_loop():
                         order = random.sample(range(1, 76), 75)
                         con.execute(
                             "UPDATE game_rounds SET status='drawing',numbers_json=?,next_draw_at=? WHERE id=?",
-                            (json.dumps(order), now + 7, row["id"])
+                            (json.dumps(order), now, row["id"])
                         )
                 elif row["status"] == "drawing" and row["next_draw_at"] is not None and now >= row["next_draw_at"]:
                     order = json.loads(row["numbers_json"])
