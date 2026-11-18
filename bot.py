@@ -692,10 +692,7 @@ B  I  N  G  O
              
 ✅           ✅
 
-💰 **የደራሽ ክፍፍል**
-ከአንድ በላይ Cartela ካሸነፈ፣ የሽልማቱ 80% በአሸናፊ Cartelaዎች መካከል በእኩል ይከፋፈላል። 20% ለቤቱ ይቀራል።
-
-🍀 መልካም እድል! BravoBingo"""
+💰 ከአንድ በላይ አሸናፊ ካለ፣ የደራሽ ገንዘቡ በአሸናፊዎች መካከል በእኩል ይከፋፈላል።"""
     await update.effective_message.reply_text(rules)
 
 
