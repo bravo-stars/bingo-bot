@@ -668,7 +668,35 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text("📖 BravoBingo Instructions\n1. Deposit money and wait for Admin approval.\n2. Open 🎮 Play | VIP.\n3. Choose 1 or 2 Cartelas (10 ETB each).\n4. Wait for the 30-second selection timer to finish.\n5. Match called numbers to your Cartela.\n6. Winners receive their share in Wallet.")
+    rules = """ℹ️ **የጨዋታ ህጎች (Game Rules)**
+━━━━━━━━━━━━━━━━━━
+
+🎯 **ጨዋታውን እንዴት ማሸነፍ ይቻላል?**
+
+በCartela ላይ ከሚከተሉት አንዱን ቀድሞ ያሟሉ፦
+
+1️⃣ አግድም መስመር (Row)
+2️⃣ ቁልቁል መስመር (Column)
+3️⃣ ሰያፍ መስመር (Diagonal)
+4️⃣ አራቱን ኮርነሮች (4 Corners)
+
+**የመስመር ምሳሌ**
+B  I  N  G  O
+✅ ✅ ✅ ✅ ✅
+
+**የ4 ኮርነሮች ምሳሌ**
+B  I  N  G  O
+✅           ✅
+             
+             
+             
+✅           ✅
+
+💰 **የደራሽ ክፍፍል**
+ከአንድ በላይ Cartela ካሸነፈ፣ የሽልማቱ 80% በአሸናፊ Cartelaዎች መካከል በእኩል ይከፋፈላል። 20% ለቤቱ ይቀራል።
+
+🍀 መልካም እድል! BravoBingo"""
+    await update.effective_message.reply_text(rules)
 
 
 async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
