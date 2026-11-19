@@ -68,6 +68,25 @@ async function ensureRound() {
     if (!row || (row.status === "finished" && row.finished_at && now >= Number(row.finished_at) + ROUND_PAUSE_SECONDS)) {
       return createRound(client, now);
     }
+
+    // Make round rollover self-healing on every API read, not only in the
+    // background worker. At zero, close selection immediately.
+    if (row.status === "open" && now >= Number(row.closes_at)) {
+      const count = await client.query(
+        "SELECT COUNT(*)::int AS count FROM round_tickets WHERE round_id=$1",
+        [row.id]
+      );
+      if (!count.rows[0].count) {
+        return createRound(client, now);
+      }
+      await client.query(
+        "UPDATE game_rounds SET status='drawing',numbers_json=$1,next_draw_at=$2 WHERE id=$3",
+        [JSON.stringify(shuffledNumbers()), now, row.id]
+      );
+      const updated = await client.query("SELECT * FROM game_rounds WHERE id=$1", [row.id]);
+      return updated.rows[0];
+    }
+
     return row;
   });
 }
