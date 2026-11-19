@@ -39,4 +39,4 @@ Health check: `/health`.
 
 ## Important before production cutover
 
-This is not ready to replace the live Python service yet. The deposit submission and approval flow, withdrawal requests and review, transaction-history view, and full admin panel still need to be ported and tested. Do not change the existing Render service's start/build commands until those flows and the Node.js deployment have been verified. The Node branch reuses the existing database schema and must be tested against a backup/staging database before production.
+This is not ready to replace the live Python service yet. The deposit submission (SMS and image proof), deposit approval/rejection, withdrawal requests and review/refunds, transaction-history view, and admin panel have been ported in this branch. They still require automated and staging-database testing before production cutover. Do not change the existing Render service's start/build commands until those flows and the Node.js deployment have been verified. The Node branch reuses the existing database schema and must be tested against a backup/staging database before production.
