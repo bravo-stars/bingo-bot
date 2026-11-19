@@ -803,35 +803,45 @@ let manualMarks={};
 
 /* TIMER */
 
-function tickTimer(){
+function tickTimer() {
+  const serverNow = Date.now() / 1000 + serverTimeOffset;
 
-  if(timerTarget!==null){
-
-    const left=Math.max(
+  if (timerTarget !== null) {
+    const left = Math.max(
       0,
-      Math.ceil(timerTarget-Date.now()/1000+serverTimeOffset)
+      Math.ceil(timerTarget - serverNow)
     );
 
-    timer.textContent=left+'s';
+    timer.textContent = left + 's';
 
-    if(winnerUntil!==null){
-      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000+serverTimeOffset));
-      const nextLabel=document.getElementById('winnerNext');
-      if(nextLabel) nextLabel.textContent=winnerLeft>0
-        ? 'NEXT ROUND: '+winnerLeft+'s'
-        : 'OPENING NEXT ROUND…';
-    }
+    if (game && game.status === 'open') {
+      const locked = serverNow >= timerTarget;
 
-    // Lock selection during the final two seconds of the window.
-    if(game && game.status==='open'){
-      const locked=(timerTarget-Date.now()/1000+serverTimeOffset)<=0;
-      grid.querySelectorAll('.ticket').forEach((ticket)=>{
-        if(!ticket.classList.contains('taken') &&
-           !ticket.classList.contains('owned')){
-          ticket.disabled=locked;
+      grid.querySelectorAll('.ticket').forEach(ticket => {
+        if (
+          !ticket.classList.contains('taken') &&
+          !ticket.classList.contains('owned')
+        ) {
+          ticket.disabled = locked;
         }
       });
-      if(locked) confirmBtn.disabled=true;
+
+      if (locked) confirmBtn.disabled = true;
+    }
+  }
+
+  if (winnerUntil !== null) {
+    const winnerLeft = Math.max(
+      0,
+      Math.ceil(winnerUntil - serverNow)
+    );
+
+    const nextLabel = document.getElementById('winnerNext');
+
+    if (nextLabel) {
+      nextLabel.textContent = winnerLeft > 0
+        ? 'NEXT ROUND: ' + winnerLeft + 's'
+        : 'OPENING NEXT ROUND…';
     }
   }
 }
