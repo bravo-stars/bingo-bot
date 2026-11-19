@@ -272,6 +272,14 @@ def ensure_round():
                 (now, now + 30, datetime.now(timezone.utc).isoformat())
             )
             row = con.execute("SELECT * FROM game_rounds WHERE id=?", (cur.fetchone()["id"],)).fetchone()
+        elif row["status"] == "open" and (float(row["closes_at"]) - float(row["opens_at"])) > 30:
+            # Repair legacy/incorrectly-created selection windows. Keep the
+            # server authoritative and give players exactly a fresh 30 seconds.
+            con.execute(
+                "UPDATE game_rounds SET opens_at=?, closes_at=? WHERE id=? AND status='open'",
+                (now, now + 30, row["id"])
+            )
+            row = con.execute("SELECT * FROM game_rounds WHERE id=?", (row["id"],)).fetchone()
         con.commit()
         return {key: row[key] for key in row.keys()}
 
