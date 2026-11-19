@@ -17,7 +17,12 @@ const io = new Server(server, { cors: { origin: false } });
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "32kb" }));
-app.use("/telegram", webhookCallback(bot, "express"));
+app.use("/telegram", (req, res, next) => {
+  if (WEBHOOK_SECRET && req.get("x-telegram-bot-api-secret-token") !== WEBHOOK_SECRET) {
+    return res.sendStatus(403);
+  }
+  next();
+}, webhookCallback(bot, "express"));
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "bravobingo-node" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "webapp", "index.html")));
