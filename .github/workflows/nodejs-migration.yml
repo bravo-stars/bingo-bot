@@ -1,0 +1,29 @@
+name: Node.js migration checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server.js"
+      - "src/**"
+      - "test/**"
+      - "package.json"
+      - ".github/workflows/nodejs-migration.yml"
+  push:
+    branches: [nodejs-migration]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: node --check server.js
+      - run: node --check src/db.js
+      - run: node --check src/auth.js
+      - run: node --check src/gameEngine.js
+      - run: node --check src/telegram.js
+      - run: npm test
