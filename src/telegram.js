@@ -37,7 +37,8 @@ async function depositProof(ctx,s,proof,hash,fileId){
  const id=r.rows[0].id;
  const caption="💳 BravoBingo Deposit Request #"+id+"\nUser ID: "+uid+"\nName: "+(ctx.from.first_name||"")+"\nUsername: @"+(ctx.from.username||"none")+"\nMethod: "+s.method+"\nRequested amount: "+cash(s.cents)+" ETB\n\nApprove: /approve_deposit "+id+" AMOUNT_ETB\nReject: /reject_deposit "+id;
  try{
-  if(fileId) await bot.api.sendPhoto(ADMIN_ID,fileId,{caption:caption.slice(0,1024)});
+  if(fileId && ctx.message?.document) await bot.api.sendDocument(ADMIN_ID,fileId,{caption:caption.slice(0,1024)});
+  else if(fileId) await bot.api.sendPhoto(ADMIN_ID,fileId,{caption:caption.slice(0,1024)});
   else await bot.api.sendMessage(ADMIN_ID,caption+"\n\nPayment SMS:\n"+proof.slice(0,3000));
  }catch(e){console.error(e);return ctx.reply("ጥያቄው ተመዝግቧል፣ ግን Admin ማሳወቂያ አልተላከም።");}
  await query("DELETE FROM deposit_sessions WHERE user_id=$1",[uid]);clear(uid);
@@ -114,8 +115,13 @@ bot.command("approve_deposit",approveDeposit);bot.command("reject_deposit",rejec
 bot.command("approve_withdrawal",ctx=>reviewWithdrawal(ctx,true));bot.command("reject_withdrawal",ctx=>reviewWithdrawal(ctx,false));bot.command("admin",adminPanel);bot.callbackQuery(/^admin:/,adminAction);
 
 bot.on("message:text",async ctx=>{
- const t=ctx.message.text.trim(),id=String(ctx.from.id),s=state(id);
+ const t=ctx.message.text.trim(),id=String(ctx.from.id);
  if(t.startsWith("/"))return;
+ if(!state(id).step){
+  const saved=await query("SELECT method,requested_amount_cents FROM deposit_sessions WHERE user_id=$1",[id]);
+  if(saved.rows[0])save(id,{step:"deposit_proof",method:saved.rows[0].method,cents:saved.rows[0].requested_amount_cents});
+ }
+ const s=state(id);
  if(t==="🎮 Play")return ctx.reply("🎮 VIP ROOM — Choose up to 2 Cartelas.",{reply_markup:new InlineKeyboard().webApp("🎟 Open VIP Cartela 1–600",BASE_URL+"/")});
  if(t==="💰 Check your balance")return showBalance(ctx);
  if(t==="💳 Deposit")return depositStart(ctx);if(t==="🏧 Withdrawal")return withdrawStart(ctx);
