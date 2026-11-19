@@ -15,10 +15,10 @@ async function state(id){
  const r=await query("SELECT state_json FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);
  try{return r.rows[0]?JSON.parse(r.rows[0].state_json):{};}catch{return {};}
 }
-async function await save(id,s){
+async function save(id,s){
  await query("INSERT INTO bot_flow_sessions(user_id,state_json,updated_at) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET state_json=EXCLUDED.state_json,updated_at=EXCLUDED.updated_at",[String(id),JSON.stringify(s),new Date().toISOString()]);
 }
-async function await clear(id){await query("DELETE FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);}
+async function clear(id){await query("DELETE FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);}
 async function ensureUser(u){
  const name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"Player";
  await query("INSERT INTO bot_users(user_id,full_name,username,registered_at) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET full_name=EXCLUDED.full_name,username=EXCLUDED.username",[String(u.id),name,u.username||null,new Date().toISOString()]);
