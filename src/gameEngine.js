@@ -1,7 +1,7 @@
 const { withTransaction } = require("./db");
 
 const SELECTION_SECONDS = 30;
-const DRAW_INTERVAL_SECONDS = 7;
+const DRAW_INTERVAL_SECONDS = 6;
 const ROUND_PAUSE_SECONDS = 8;
 const TICKET_PRICE_CENTS = 1000;
 
