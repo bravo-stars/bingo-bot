@@ -149,7 +149,12 @@ bot.on("message:text",async ctx=>{
  }
 });
 bot.on(["message:photo","message:document"],async ctx=>{
- const id=String(ctx.from.id),s=state(id);if(s.step!=="deposit_proof")return ctx.reply("📌 መጀመሪያ /deposit ይጫኑ።");
+ const id=String(ctx.from.id);let s=state(id);
+ if(s.step!=="deposit_proof"){
+  const saved=await query("SELECT method,requested_amount_cents FROM deposit_sessions WHERE user_id=$1",[id]);
+  if(saved.rows[0]){s={step:"deposit_proof",method:saved.rows[0].method,cents:saved.rows[0].requested_amount_cents};save(id,s);}
+ }
+ if(s.step!=="deposit_proof")return ctx.reply("📌 መጀመሪያ /deposit ይጫኑ።");
  const p=ctx.message.photo?.at(-1),d=ctx.message.document;if(!p&&!(d?.mime_type||"").startsWith("image/"))return;
  const f=p||d,proof="[IMAGE] file_unique_id="+f.file_unique_id+"\nCaption: "+(ctx.message.caption||"");
  return depositProof(ctx,s,proof,crypto.createHash("sha256").update(id+":"+f.file_unique_id).digest("hex"),f.file_id);
