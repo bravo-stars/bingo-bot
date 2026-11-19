@@ -823,7 +823,7 @@ function tickTimer(){
 
     // Lock selection during the final two seconds of the window.
     if(game && game.status==='open'){
-      const locked=(timerTarget-Date.now()/1000)<=2;
+      const locked=(timerTarget-Date.now()/1000)<=0;
       grid.querySelectorAll('.ticket').forEach((ticket)=>{
         if(!ticket.classList.contains('taken') &&
            !ticket.classList.contains('owned')){
@@ -944,7 +944,7 @@ function render(){
       isTaken ||
       !game ||
       game.status!=='open' ||
-      (Number(game.closes_at||0)-Date.now()/1000)<=2
+      (Number(game.closes_at||0)-Date.now()/1000)<=0
     );
 
     b.onclick=()=>{
