@@ -488,6 +488,7 @@ async def ticket_status(request):
         "round_id": round_info["id"],
         "status": full_round["status"],
         "closes_at": full_round["closes_at"],
+        "server_now": time.time(),
         "finished_at": full_round["finished_at"],
         "next_draw_at": full_round["next_draw_at"],
         "drawn": json.loads(full_round["drawn_json"]),
