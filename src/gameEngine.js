@@ -87,7 +87,7 @@ async function buyTickets({ userId, userName, ticketNumbers }) {
     let round = roundResult.rows[0];
     const now = Date.now() / 1000;
     if (!round) round = await createRound(client, now);
-    if (round.status !== "open" || now >= Number(round.closes_at) - 2) {
+    if (round.status !== "open" || now >= Number(round.closes_at)) {
       const error = new Error("Ticket selection is closed. Wait for the next round.");
       error.status = 409;
       throw error;
