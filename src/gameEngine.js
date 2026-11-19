@@ -93,6 +93,15 @@ async function buyTickets({ userId, userName, ticketNumbers }) {
       throw error;
     }
 
+    const soldResult = await client.query(
+      "SELECT ticket_no FROM round_tickets WHERE round_id=$1 AND ticket_no=ANY($2::int[]) AND user_id<>$3",
+      [round.id, ticketNumbers, userId]
+    );
+    if (soldResult.rowCount) {
+      const error = new Error("Cartela " + soldResult.rows[0].ticket_no + " is already taken. Refresh and choose another.");
+      error.status = 409;
+      throw error;
+    }
     const existingResult = await client.query(
       "SELECT ticket_no FROM round_tickets WHERE round_id=$1 AND user_id=$2",
       [round.id, userId]
@@ -186,7 +195,7 @@ async function getRoundStatus(userId) {
       house_etb: Number(game.house_cents || 0) / 100,
       claimed: rows.map(r => Number(r.ticket_no)),
       player_count: new Set(rows.map(r => String(r.user_id))).size,
-      prize_pool_etb: rows.length * 8,
+      prize_pool_etb: (rows.length * TICKET_PRICE_CENTS * 0.8) / 100,
       mine: mineRows.map(r => Number(r.ticket_no)),
       balance_etb: balance / 100,
       cards: Object.fromEntries(mineRows.map(r => [String(r.ticket_no), JSON.parse(r.card_json)]))
