@@ -794,6 +794,7 @@ let loading=false;
 let balanceUpdatedAt=0;
 let lastGridSignature='';
 let timerTarget=null;
+let serverTimeOffset=0;
 let winnerModalRound=null;
 let winnerUntil=null;
 let previewCards={};
@@ -808,13 +809,13 @@ function tickTimer(){
 
     const left=Math.max(
       0,
-      Math.ceil(timerTarget-Date.now()/1000)
+      Math.ceil(timerTarget-Date.now()/1000+serverTimeOffset)
     );
 
     timer.textContent=left+'s';
 
     if(winnerUntil!==null){
-      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000));
+      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000+serverTimeOffset));
       const nextLabel=document.getElementById('winnerNext');
       if(nextLabel) nextLabel.textContent=winnerLeft>0
         ? 'NEXT ROUND: '+winnerLeft+'s'
@@ -823,7 +824,7 @@ function tickTimer(){
 
     // Lock selection during the final two seconds of the window.
     if(game && game.status==='open'){
-      const locked=(timerTarget-Date.now()/1000)<=0;
+      const locked=(timerTarget-Date.now()/1000+serverTimeOffset)<=0;
       grid.querySelectorAll('.ticket').forEach((ticket)=>{
         if(!ticket.classList.contains('taken') &&
            !ticket.classList.contains('owned')){
@@ -944,7 +945,7 @@ function render(){
       isTaken ||
       !game ||
       game.status!=='open' ||
-      (Number(game.closes_at||0)-Date.now()/1000)<=0
+      (Number(game.closes_at||0)-Date.now()/1000+serverTimeOffset)<=0
     );
 
     b.onclick=()=>{
@@ -1138,7 +1139,10 @@ function getWinningCells(rows,drawn){
 
 function renderGame(d){
 
-  const now=Date.now()/1000;
+  if(Number.isFinite(Number(d.server_now))){
+    serverTimeOffset=Number(d.server_now)-Date.now()/1000;
+  }
+  const now=Date.now()/1000+serverTimeOffset;
 
   const drawn=d.drawn||[];
 
@@ -1297,7 +1301,7 @@ function renderGame(d){
         cardBox.appendChild(section);
       });
 
-      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000));
+      const winnerLeft=Math.max(0,Math.ceil(winnerUntil-Date.now()/1000+serverTimeOffset));
       document.getElementById('winnerNext').textContent=
         winnerLeft>0?'NEXT ROUND: '+winnerLeft+'s':'OPENING NEXT ROUND…';
 
