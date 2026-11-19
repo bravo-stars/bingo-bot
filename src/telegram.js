@@ -7,14 +7,18 @@ const BASE_URL=(process.env.RENDER_EXTERNAL_URL||"").replace(/\/$/,"");
 const ADMIN_ID=String(process.env.ADMIN_ID||"7504691975");
 if(!TOKEN||!BASE_URL) throw new Error("BOT_TOKEN and RENDER_EXTERNAL_URL are required");
 const bot=new Bot(TOKEN);
-const states=new Map();
 const menu=new Keyboard().text("🎮 Play").row().text("💰 Check your balance").row().text("💳 Deposit").row().text("🏧 Withdrawal").row().text("📜 Transaction History").row().text("📖 Instruction").row().text("👤 Register").resized();
 const payMenu=new Keyboard().text("📱 TELE-Birr").row().text("🏦 CBE-Birr").row().text("⬅️ Back").resized();
 const cash=n=>(Number(n||0)/100).toFixed(2);
 const isAdmin=ctx=>String(ctx.from?.id)===ADMIN_ID;
-const state=id=>states.get(String(id))||{};
-const save=(id,s)=>states.set(String(id),s);
-const clear=id=>states.delete(String(id));
+async function state(id){
+ const r=await query("SELECT state_json FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);
+ try{return r.rows[0]?JSON.parse(r.rows[0].state_json):{};}catch{return {};}
+}
+async function save(id,s){
+ await query("INSERT INTO bot_flow_sessions(user_id,state_json,updated_at) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET state_json=EXCLUDED.state_json,updated_at=EXCLUDED.updated_at",[String(id),JSON.stringify(s),new Date().toISOString()]);
+}
+async function clear(id){await query("DELETE FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);}
 async function ensureUser(u){
  const name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"Player";
  await query("INSERT INTO bot_users(user_id,full_name,username,registered_at) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET full_name=EXCLUDED.full_name,username=EXCLUDED.username",[String(u.id),name,u.username||null,new Date().toISOString()]);
@@ -28,8 +32,8 @@ async function history(ctx){
  const r=await query("SELECT kind,amount_cents,description,created_at FROM wallet_transactions WHERE user_id=$1 ORDER BY id DESC LIMIT 10",[String(ctx.from.id)]);
  return ctx.reply(r.rows.length?"📜 Recent transactions:\n"+r.rows.map(x=>String(x.created_at).slice(0,16)+" | "+x.kind+" | "+cash(x.amount_cents)+" ETB | "+x.description).join("\n"):"No transactions yet.");
 }
-async function depositStart(ctx){clear(ctx.from.id);save(ctx.from.id,{step:"deposit_method"});return ctx.reply("💳 BravoBingo Deposit\nየማስገቢያ መንገድ ይምረጡ:",{reply_markup:payMenu});}
-async function withdrawStart(ctx){clear(ctx.from.id);save(ctx.from.id,{step:"withdraw_method"});return ctx.reply("🏧 የWithdrawal መንገድ ይምረጡ:",{reply_markup:payMenu});}
+async function depositStart(ctx){await clear(ctx.from.id);await save(ctx.from.id,{step:"deposit_method"});return ctx.reply("💳 BravoBingo Deposit\nየማስገቢያ መንገድ ይምረጡ:",{reply_markup:payMenu});}
+async function withdrawStart(ctx){await clear(ctx.from.id);await save(ctx.from.id,{step:"withdraw_method"});return ctx.reply("🏧 የWithdrawal መንገድ ይምረጡ:",{reply_markup:payMenu});}
 async function depositProof(ctx,s,proof,hash,fileId){
  const uid=String(ctx.from.id);
  const r=await query("INSERT INTO deposit_requests(user_id,method,sms_text,sms_hash,requested_amount_cents,created_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(sms_hash) DO NOTHING RETURNING id",[uid,s.method,proof,hash,s.cents,new Date().toISOString()]);
@@ -41,7 +45,7 @@ async function depositProof(ctx,s,proof,hash,fileId){
   else if(fileId) await bot.api.sendPhoto(ADMIN_ID,fileId,{caption:caption.slice(0,1024)});
   else await bot.api.sendMessage(ADMIN_ID,caption+"\n\nPayment SMS:\n"+proof.slice(0,3000));
  }catch(e){console.error(e);return ctx.reply("ጥያቄው ተመዝግቧል፣ ግን Admin ማሳወቂያ አልተላከም።");}
- await query("DELETE FROM deposit_sessions WHERE user_id=$1",[uid]);clear(uid);
+ await query("DELETE FROM deposit_sessions WHERE user_id=$1",[uid]);await clear(uid);
  return ctx.reply("✅ የDeposit ጥያቄዎ #"+id+" ተልኳል። Admin ካረጋገጠ በኋላ Wallet ይጨመራል።");
 }
 async function approveDeposit(ctx){
@@ -106,7 +110,7 @@ async function adminAction(ctx){
  return ctx.editMessageText(out,{reply_markup:new InlineKeyboard().text("⬅️ Admin menu","admin:menu")});
 }
 
-bot.command("start",async ctx=>{await ensureUser(ctx.from);clear(ctx.from.id);await ctx.reply("🎉 Welcome to BravoBingo! Choose an option:",{reply_markup:menu});});
+bot.command("start",async ctx=>{await ensureUser(ctx.from);await clear(ctx.from.id);await ctx.reply("🎉 Welcome to BravoBingo! Choose an option:",{reply_markup:menu});});
 bot.command("play",ctx=>ctx.reply("🎮 VIP ROOM — Choose up to 2 Cartelas.",{reply_markup:new InlineKeyboard().webApp("🎟 Open VIP Cartela 1–600",BASE_URL+"/")}));
 bot.command("balance",showBalance);bot.command("deposit",depositStart);bot.command("withdraw",withdrawStart);bot.command("history",history);
 bot.command("instructions",ctx=>ctx.reply("🎯 BravoBingo VIP Rules\n• Each Cartela costs 10 ETB.\n• Choose up to 2 Cartelas during the 30-second selection period.\n• Numbers are called every 3 seconds.\n• Row, column, diagonal, or four corners wins.\n• 80% of the ticket pool goes to winners; 20% is the house share."));
@@ -117,18 +121,19 @@ bot.command("approve_withdrawal",ctx=>reviewWithdrawal(ctx,true));bot.command("r
 bot.on("message:text",async ctx=>{
  const t=ctx.message.text.trim(),id=String(ctx.from.id);
  if(t.startsWith("/"))return;
- if(!state(id).step){
+ let currentState=await state(id);
+ if(!currentState.step){
   const saved=await query("SELECT method,requested_amount_cents FROM deposit_sessions WHERE user_id=$1",[id]);
-  if(saved.rows[0])save(id,{step:"deposit_proof",method:saved.rows[0].method,cents:saved.rows[0].requested_amount_cents});
+  if(saved.rows[0])await save(id,{step:"deposit_proof",method:saved.rows[0].method,cents:saved.rows[0].requested_amount_cents});
  }
- const s=state(id);
+ const s=await state(id);
  if(t==="🎮 Play")return ctx.reply("🎮 VIP ROOM — Choose up to 2 Cartelas.",{reply_markup:new InlineKeyboard().webApp("🎟 Open VIP Cartela 1–600",BASE_URL+"/")});
  if(t==="💰 Check your balance")return showBalance(ctx);
  if(t==="💳 Deposit")return depositStart(ctx);if(t==="🏧 Withdrawal")return withdrawStart(ctx);
  if(t==="📜 Transaction History")return history(ctx);
  if(t==="📖 Instruction")return ctx.reply("Each Cartela costs 10 ETB. Select up to 2 within 30 seconds. Numbers are called every 3 seconds. Row, column, diagonal or four corners wins. 80% goes to winners; 20% is house.");
  if(t==="👤 Register"){await ensureUser(ctx.from);return ctx.reply("✅ Your BravoBingo account is registered.");}
- if(t==="⬅️ Back"){clear(id);await query("DELETE FROM deposit_sessions WHERE user_id=$1",[id]);return ctx.reply("Main menu:",{reply_markup:menu});}
+ if(t==="⬅️ Back"){await clear(id);await query("DELETE FROM deposit_sessions WHERE user_id=$1",[id]);return ctx.reply("Main menu:",{reply_markup:menu});}
  if(s.step==="deposit_method"&&["📱 TELE-Birr","🏦 CBE-Birr"].includes(t)){const m=t.includes("TELE")?"TELE-Birr":"CBE-Birr";save(id,{step:"deposit_amount",method:m});return ctx.reply(m+"\nየሚያስገቡትን ብር መጠን ያስገቡ። (Minimum: 10 ETB)");}
  if(s.step==="deposit_amount"){
   const a=Number(t.replace(/,/g,"").replace(/\s*(ETB|birr|ብር)$/i,""));if(!Number.isFinite(a)||a<10||Math.round(a*100)!==a*100)return ctx.reply("❌ ቢያንስ 10 ETB ያስገቡ።");
@@ -149,10 +154,10 @@ bot.on("message:text",async ctx=>{
  }
 });
 bot.on(["message:photo","message:document"],async ctx=>{
- const id=String(ctx.from.id);let s=state(id);
+ const id=String(ctx.from.id);let s=await state(id);
  if(s.step!=="deposit_proof"){
   const saved=await query("SELECT method,requested_amount_cents FROM deposit_sessions WHERE user_id=$1",[id]);
-  if(saved.rows[0]){s={step:"deposit_proof",method:saved.rows[0].method,cents:saved.rows[0].requested_amount_cents};save(id,s);}
+  if(saved.rows[0]){s={step:"deposit_proof",method:saved.rows[0].method,cents:saved.rows[0].requested_amount_cents};await save(id,s);}
  }
  if(s.step!=="deposit_proof")return ctx.reply("📌 መጀመሪያ /deposit ይጫኑ።");
  const p=ctx.message.photo?.at(-1),d=ctx.message.document;if(!p&&!(d?.mime_type||"").startsWith("image/"))return;
