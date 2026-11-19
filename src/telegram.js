@@ -15,10 +15,10 @@ async function state(id){
  const r=await query("SELECT state_json FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);
  try{return r.rows[0]?JSON.parse(r.rows[0].state_json):{};}catch{return {};}
 }
-async function save(id,s){
+async function await save(id,s){
  await query("INSERT INTO bot_flow_sessions(user_id,state_json,updated_at) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET state_json=EXCLUDED.state_json,updated_at=EXCLUDED.updated_at",[String(id),JSON.stringify(s),new Date().toISOString()]);
 }
-async function clear(id){await query("DELETE FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);}
+async function await clear(id){await query("DELETE FROM bot_flow_sessions WHERE user_id=$1",[String(id)]);}
 async function ensureUser(u){
  const name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"Player";
  await query("INSERT INTO bot_users(user_id,full_name,username,registered_at) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET full_name=EXCLUDED.full_name,username=EXCLUDED.username",[String(u.id),name,u.username||null,new Date().toISOString()]);
@@ -134,23 +134,23 @@ bot.on("message:text",async ctx=>{
  if(t==="📖 Instruction")return ctx.reply("Each Cartela costs 10 ETB. Select up to 2 within 30 seconds. Numbers are called every 3 seconds. Row, column, diagonal or four corners wins. 80% goes to winners; 20% is house.");
  if(t==="👤 Register"){await ensureUser(ctx.from);return ctx.reply("✅ Your BravoBingo account is registered.");}
  if(t==="⬅️ Back"){await clear(id);await query("DELETE FROM deposit_sessions WHERE user_id=$1",[id]);return ctx.reply("Main menu:",{reply_markup:menu});}
- if(s.step==="deposit_method"&&["📱 TELE-Birr","🏦 CBE-Birr"].includes(t)){const m=t.includes("TELE")?"TELE-Birr":"CBE-Birr";save(id,{step:"deposit_amount",method:m});return ctx.reply(m+"\nየሚያስገቡትን ብር መጠን ያስገቡ። (Minimum: 10 ETB)");}
+ if(s.step==="deposit_method"&&["📱 TELE-Birr","🏦 CBE-Birr"].includes(t)){const m=t.includes("TELE")?"TELE-Birr":"CBE-Birr";await save(id,{step:"deposit_amount",method:m});return ctx.reply(m+"\nየሚያስገቡትን ብር መጠን ያስገቡ። (Minimum: 10 ETB)");}
  if(s.step==="deposit_amount"){
   const a=Number(t.replace(/,/g,"").replace(/\s*(ETB|birr|ብር)$/i,""));if(!Number.isFinite(a)||a<10||Math.round(a*100)!==a*100)return ctx.reply("❌ ቢያንስ 10 ETB ያስገቡ።");
   const cents=Math.round(a*100);await query("INSERT INTO deposit_sessions(user_id,method,requested_amount_cents,updated_at) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET method=EXCLUDED.method,requested_amount_cents=EXCLUDED.requested_amount_cents,updated_at=EXCLUDED.updated_at",[id,s.method,cents,new Date().toISOString()]);
-  save(id,{step:"deposit_proof",method:s.method,cents});return ctx.reply("💳 "+s.method+"\nየሚከፍሉት መጠን: "+cash(cents)+" ETB\nስልክ ቁጥር: 0945723383\nAccount Name: Samuel Adino\n\n1. ትክክለኛውን መጠን ይክፈሉ።\n2. Screenshot ወይም የደረሰዎትን SMS Copy/Paste ያድርጉ።\n3. Admin ካረጋገጠ በኋላ Wallet ይጨመራል።");
+  await save(id,{step:"deposit_proof",method:s.method,cents});return ctx.reply("💳 "+s.method+"\nየሚከፍሉት መጠን: "+cash(cents)+" ETB\nስልክ ቁጥር: 0945723383\nAccount Name: Samuel Adino\n\n1. ትክክለኛውን መጠን ይክፈሉ።\n2. Screenshot ወይም የደረሰዎትን SMS Copy/Paste ያድርጉ።\n3. Admin ካረጋገጠ በኋላ Wallet ይጨመራል።");
  }
  if(s.step==="deposit_proof")return depositProof(ctx,s,t,crypto.createHash("sha256").update(t).digest("hex"),null);
- if(s.step==="withdraw_method"&&["📱 TELE-Birr","🏦 CBE-Birr"].includes(t)){save(id,{step:"withdraw_amount",method:t.includes("TELE")?"TELE-Birr":"CBE-Birr"});return ctx.reply("የሚወጣውን ብር መጠን ያስገቡ።");}
+ if(s.step==="withdraw_method"&&["📱 TELE-Birr","🏦 CBE-Birr"].includes(t)){await save(id,{step:"withdraw_amount",method:t.includes("TELE")?"TELE-Birr":"CBE-Birr"});return ctx.reply("የሚወጣውን ብር መጠን ያስገቡ።");}
  if(s.step==="withdraw_amount"){
   const a=Number(t.replace(/,/g,"").replace(/\s*(ETB|birr|ብር)$/i,""));if(!Number.isFinite(a)||a<=0||Math.round(a*100)!==a*100)return ctx.reply("ትክክለኛ የብር መጠን ያስገቡ።");
   const cents=Math.round(a*100),w=await query("SELECT balance_cents FROM wallets WHERE user_id=$1",[id]);if(cents>Number(w.rows[0]?.balance_cents||0))return ctx.reply("Balanceዎ "+cash(w.rows[0]?.balance_cents)+" ETB ብቻ ነው።");
-  save(id,{step:"withdraw_account",method:s.method,cents});return ctx.reply("የሚቀበሉበት ቁጥር እና Account Name ይላኩ።");
+  await save(id,{step:"withdraw_account",method:s.method,cents});return ctx.reply("የሚቀበሉበት ቁጥር እና Account Name ይላኩ።");
  }
  if(s.step==="withdraw_account"){
   const details=t.slice(0,500),cents=s.cents;
   const rid=await withTransaction(async c=>{const u=await c.query("UPDATE wallets SET balance_cents=balance_cents-$1 WHERE user_id=$2 AND balance_cents >= $1 RETURNING balance_cents",[cents,id]);if(!u.rows.length)throw new Error("በቂ Balance የለዎትም።");const q=await c.query("INSERT INTO withdrawal_requests(user_id,method,amount_cents,account_details,created_at) VALUES($1,$2,$3,$4,$5) RETURNING id",[id,s.method,cents,details,new Date().toISOString()]);await c.query("INSERT INTO wallet_transactions(user_id,kind,amount_cents,description,created_at) VALUES($1,'WITHDRAWAL_HOLD',$2,$3,$4)",[id,-cents,"Withdrawal #"+q.rows[0].id,new Date().toISOString()]);return q.rows[0].id;});
-  clear(id);await bot.api.sendMessage(ADMIN_ID,"🏧 WITHDRAWAL #"+rid+"\nUser: "+id+"\nMethod: "+s.method+"\nAmount: "+cash(cents)+" ETB\nAccount: "+details+"\nApprove: /approve_withdrawal "+rid+"\nReject/refund: /reject_withdrawal "+rid);return ctx.reply("✅ Withdrawal #"+rid+" ተመዝግቧል። "+cash(cents)+" ETB ከWallet ተይዟል።");
+  await clear(id);await bot.api.sendMessage(ADMIN_ID,"🏧 WITHDRAWAL #"+rid+"\nUser: "+id+"\nMethod: "+s.method+"\nAmount: "+cash(cents)+" ETB\nAccount: "+details+"\nApprove: /approve_withdrawal "+rid+"\nReject/refund: /reject_withdrawal "+rid);return ctx.reply("✅ Withdrawal #"+rid+" ተመዝግቧል። "+cash(cents)+" ETB ከWallet ተይዟል።");
  }
 });
 bot.on(["message:photo","message:document"],async ctx=>{
