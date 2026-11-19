@@ -193,6 +193,7 @@ async function getRoundStatus(userId) {
       round_id: Number(game.id),
       status: game.status,
       closes_at: Number(game.closes_at),
+      server_now: Date.now() / 1000,
       finished_at: game.finished_at === null ? null : Number(game.finished_at),
       next_draw_at: game.next_draw_at === null ? null : Number(game.next_draw_at),
       drawn: JSON.parse(game.drawn_json || "[]"),
