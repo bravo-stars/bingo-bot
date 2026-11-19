@@ -1,0 +1,20 @@
+{
+  "name": "bravobingo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BravoBingo Telegram multiplayer game server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "grammy": "^1.38.3",
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.1"
+  }
+}
