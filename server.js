@@ -43,7 +43,9 @@ app.get("/api/preview", requireTelegramUser, async (req, res, next) => {
       return res.status(400).send("Choose one or two Cartelas from 1 to 600.");
     }
     const round = await ensureRound();
-    if (round.status !== "open") return res.status(409).send("Cartela selection is closed.");
+    if (round.status !== "open" || Date.now() / 1000 >= Number(round.closes_at)) {
+      return res.status(409).send("Cartela selection is closed. Wait for the next round.");
+    }
     const sold = await query("SELECT ticket_no FROM round_tickets WHERE round_id=$1 AND ticket_no=ANY($2::int[])", [round.id, numbers]);
     if (sold.rowCount) return res.status(409).send("One of the selected Cartelas is already sold.");
     res.json({ round_id: Number(round.id), cards: Object.fromEntries(numbers.map(n => [String(n), makeCard(`${round.id}:${n}`)])) });
