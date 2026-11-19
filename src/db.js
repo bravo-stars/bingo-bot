@@ -115,6 +115,7 @@ async function initDb() {
       created_at TEXT NOT NULL
     );
   `);
+  await query("CREATE TABLE IF NOT EXISTS bot_flow_sessions (user_id BIGINT PRIMARY KEY, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)");
   await query("ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS requested_amount_cents INTEGER");
   await query("ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS winners_json TEXT NOT NULL DEFAULT '[]'");
   await query("ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS prize_cents INTEGER NOT NULL DEFAULT 0");
