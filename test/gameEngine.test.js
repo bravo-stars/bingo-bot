@@ -1,7 +1,13 @@
 process.env.DATABASE_URL = process.env.DATABASE_URL || "postgresql://unused:unused@127.0.0.1:5432/unused";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { makeCard, hasWinningPattern } = require("../src/gameEngine");
+const { makeCard, hasWinningPattern, SELECTION_SECONDS, DRAW_INTERVAL_SECONDS, ROUND_PAUSE_SECONDS } = require("../src/gameEngine");
+
+test("server round timing matches the VIP game rules", () => {
+  assert.equal(SELECTION_SECONDS, 30);
+  assert.equal(DRAW_INTERVAL_SECONDS, 6);
+  assert.equal(ROUND_PAUSE_SECONDS, 10);
+});
 
 test("generated card is a valid 5x5 Bingo card with FREE center", () => {
   const card = makeCard("test-round:12");
