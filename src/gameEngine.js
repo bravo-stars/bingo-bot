@@ -87,7 +87,7 @@ async function buyTickets({ userId, userName, ticketNumbers }) {
     let round = roundResult.rows[0];
     const now = Date.now() / 1000;
     if (!round) round = await createRound(client, now);
-    if (round.status !== "open" || now >= Number(round.closes_at) - 2) {
+    if (round.status !== "open" || now >= Number(round.closes_at)) {
       const error = new Error("Ticket selection is closed. Wait for the next round.");
       error.status = 409;
       throw error;
@@ -225,7 +225,7 @@ async function advanceGame() {
       } else {
         await client.query(
           "UPDATE game_rounds SET status='drawing',numbers_json=$1,next_draw_at=$2 WHERE id=$3",
-          [JSON.stringify(shuffledNumbers()), now, round.id]
+          [JSON.stringify(shuffledNumbers()), now + DRAW_INTERVAL_SECONDS, round.id]
         );
       }
       return;
