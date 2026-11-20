@@ -81,7 +81,7 @@ async function ensureRound() {
       }
       await client.query(
         "UPDATE game_rounds SET status='drawing',numbers_json=$1,next_draw_at=$2 WHERE id=$3",
-        [JSON.stringify(shuffledNumbers()), now + DRAW_INTERVAL_SECONDS, row.id]
+        [JSON.stringify(shuffledNumbers()), now + 1, row.id]
       );
       const updated = await client.query("SELECT * FROM game_rounds WHERE id=$1", [row.id]);
       return updated.rows[0];
@@ -236,7 +236,7 @@ async function advanceGame() {
       } else {
         await client.query(
           "UPDATE game_rounds SET status='drawing',numbers_json=$1,next_draw_at=$2 WHERE id=$3",
-          [JSON.stringify(shuffledNumbers()), now + DRAW_INTERVAL_SECONDS, round.id]
+          [JSON.stringify(shuffledNumbers()), now + 1, round.id]
         );
       }
       return;
