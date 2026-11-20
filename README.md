@@ -13,7 +13,7 @@ The original `main` branch and its Render deployment are intentionally unchanged
 - grammY Telegram bot webhook
 - PostgreSQL access using the existing Neon schema and data
 - Server-owned 30-second Cartela selection window
-- Server-owned number draw every 3 seconds
+- Server-owned number draw every 6 seconds
 - Up to two Cartelas per player per round; 10 ETB per Cartela
 - Server-side row, column, diagonal, and four-corner winner checks
 - 80% winner pool / 20% house share
