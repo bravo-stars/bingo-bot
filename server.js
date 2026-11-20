@@ -3,7 +3,7 @@ const path = require("node:path");
 const express = require("express");
 const { Server } = require("socket.io");
 const { webhookCallback } = require("grammy");
-const { initDb, query } = require("./src/db");
+const { initDb, query, pool } = require("./src/db");
 const { requireTelegramUser } = require("./src/auth");
 const { ensureRound, getRoundStatus, buyTickets, advanceGame, makeCard } = require("./src/gameEngine");
 const { bot } = require("./src/telegram");
@@ -71,6 +71,8 @@ app.use((error, _req, res, _next) => {
 });
 
 let worker;
+let workerClient;
+let workerBusy = false;
 async function start() {
   await initDb();
   const telegramBot = await bot.api.getMe();
@@ -79,14 +81,30 @@ async function start() {
     console.warn(`WARNING: BOT_TOKEN belongs to @${telegramBot.username}, expected @bravobingo1bot`);
   }
   await ensureRound();
-  worker = setInterval(async () => {
-    try {
-      await advanceGame();
-      io.emit("game:tick", { at: Date.now() });
-    } catch (error) {
-      console.error("Game worker error:", error);
-    }
-  }, 500);
+
+  // Only one live Render instance may run the draw worker for this database.
+  // Hold a session-level PostgreSQL advisory lock for the worker lifetime.
+  workerClient = await pool.connect();
+  const workerLock = await workerClient.query("SELECT pg_try_advisory_lock(77192352) AS locked");
+  if (workerLock.rows[0].locked) {
+    console.log("Game worker lock acquired; this instance controls ball drawing.");
+    worker = setInterval(async () => {
+      if (workerBusy) return;
+      workerBusy = true;
+      try {
+        await advanceGame();
+        io.emit("game:tick", { at: Date.now() });
+      } catch (error) {
+        console.error("Game worker error:", error);
+      } finally {
+        workerBusy = false;
+      }
+    }, 500);
+  } else {
+    console.log("Another instance owns the game worker; ball drawing is disabled on this instance.");
+    workerClient.release();
+    workerClient = null;
+  }
 
   if (BASE_URL) {
     const options = WEBHOOK_SECRET ? { secret_token: WEBHOOK_SECRET } : undefined;
@@ -99,6 +117,14 @@ async function start() {
 
 async function shutdown() {
   if (worker) clearInterval(worker);
+  if (workerClient) {
+    try {
+      await workerClient.query("SELECT pg_advisory_unlock(77192352)");
+    } finally {
+      workerClient.release();
+      workerClient = null;
+    }
+  }
   await bot.stop();
   server.close();
 }
