@@ -296,6 +296,6 @@ async function advanceGame() {
 }
 
 module.exports = {
-  SELECTION_SECONDS, DRAW_INTERVAL_SECONDS, TICKET_PRICE_CENTS,
+  SELECTION_SECONDS, DRAW_INTERVAL_SECONDS, ROUND_PAUSE_SECONDS, TICKET_PRICE_CENTS,
   makeCard, hasWinningPattern, ensureRound, buyTickets, getRoundStatus, advanceGame
 };
