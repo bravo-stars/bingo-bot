@@ -109,7 +109,7 @@ async function adminAction(ctx){
 bot.command("start",async ctx=>{await ensureUser(ctx.from);clear(ctx.from.id);await ctx.reply("🎉 Welcome to BravoBingo! Choose an option:",{reply_markup:menu});});
 bot.command("play",ctx=>ctx.reply("🎮 VIP ROOM — Choose up to 2 Cartelas.",{reply_markup:new InlineKeyboard().webApp("🎟 Open VIP Cartela 1–600",BASE_URL+"/")}));
 bot.command("balance",showBalance);bot.command("deposit",depositStart);bot.command("withdraw",withdrawStart);bot.command("history",history);
-bot.command("instructions",ctx=>ctx.reply("🎯 BravoBingo VIP Rules\n• Each Cartela costs 10 ETB.\n• Choose up to 2 Cartelas during the 30-second selection period.\n• Numbers are called every 3 seconds.\n• Row, column, diagonal, or four corners wins.\n• 80% of the ticket pool goes to winners; 20% is the house share."));
+bot.command("instructions",ctx=>ctx.reply("🎯 BravoBingo VIP Rules\n• Each Cartela costs 10 ETB.\n• Choose up to 2 Cartelas during the 30-second selection period.\n• Numbers are called every 6 seconds.\n• Row, column, diagonal, or four corners wins.\n• 80% of the ticket pool goes to winners; 20% is the house share."));
 bot.command("register",async ctx=>{await ensureUser(ctx.from);await ctx.reply("✅ Your BravoBingo account is registered.");});
 bot.command("approve_deposit",approveDeposit);bot.command("reject_deposit",rejectDeposit);
 bot.command("approve_withdrawal",ctx=>reviewWithdrawal(ctx,true));bot.command("reject_withdrawal",ctx=>reviewWithdrawal(ctx,false));bot.command("admin",adminPanel);bot.callbackQuery(/^admin:/,adminAction);
@@ -126,7 +126,7 @@ bot.on("message:text",async ctx=>{
  if(t==="💰 Check your balance")return showBalance(ctx);
  if(t==="💳 Deposit")return depositStart(ctx);if(t==="🏧 Withdrawal")return withdrawStart(ctx);
  if(t==="📜 Transaction History")return history(ctx);
- if(t==="📖 Instruction")return ctx.reply("Each Cartela costs 10 ETB. Select up to 2 within 30 seconds. Numbers are called every 3 seconds. Row, column, diagonal or four corners wins. 80% goes to winners; 20% is house.");
+ if(t==="📖 Instruction")return ctx.reply("Each Cartela costs 10 ETB. Select up to 2 within 30 seconds. Numbers are called every 6 seconds. Row, column, diagonal or four corners wins. 80% goes to winners; 20% is house.");
  if(t==="👤 Register"){await ensureUser(ctx.from);return ctx.reply("✅ Your BravoBingo account is registered.");}
  if(t==="⬅️ Back"){clear(id);await query("DELETE FROM deposit_sessions WHERE user_id=$1",[id]);return ctx.reply("Main menu:",{reply_markup:menu});}
  if(s.step==="deposit_method"&&["📱 TELE-Birr","🏦 CBE-Birr"].includes(t)){const m=t.includes("TELE")?"TELE-Birr":"CBE-Birr";save(id,{step:"deposit_amount",method:m});return ctx.reply(m+"\nየሚያስገቡትን ብር መጠን ያስገቡ። (Minimum: 10 ETB)");}
