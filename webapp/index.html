@@ -469,7 +469,7 @@ body{
 
 /* LIVE BINGO SCREEN — shown after the 30-second selection period */
 #liveGameScreen{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;background:#eef2f8;padding:8px;}
-#liveSummary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#253247;color:#fff;padding:8px;border-radius:12px;margin-bottom:8px;text-align:center;}
+#liveSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;background:#253247;color:#fff;padding:8px;border-radius:12px;margin-bottom:8px;text-align:center;}
 #liveSummary .liveStat{min-width:0;font-size:11px;font-weight:800;color:#b9c6d8;}
 #liveSummary strong{display:block;font-size:20px;color:#fff;margin-top:3px;}
 #liveSummary #livePrize{color:#4ade80;}
@@ -666,6 +666,7 @@ body,#app{background:#eef2f8;color:#263447}
   <section id="liveGameScreen" aria-label="Live Bingo game">
     <div id="liveSummary">
       <div class="liveStat">DERASH<strong id="livePrize">0 ETB</strong></div>
+      <div class="liveStat">SOLD<strong id="liveSold">0</strong></div>
       <div class="liveStat">BALLS<strong id="liveBalls">0/75</strong></div>
       <div class="liveStat">PLAYERS<strong id="livePlayers">0</strong></div>
     </div>
@@ -823,7 +824,7 @@ function tickTimer(){
 
     // Lock selection during the final two seconds of the window.
     if(game && game.status==='open'){
-      const locked=(timerTarget-Date.now()/1000)<=2;
+      const locked=(timerTarget-Date.now()/1000)<=0;
       grid.querySelectorAll('.ticket').forEach((ticket)=>{
         if(!ticket.classList.contains('taken') &&
            !ticket.classList.contains('owned')){
@@ -944,7 +945,7 @@ function render(){
       isTaken ||
       !game ||
       game.status!=='open' ||
-      (Number(game.closes_at||0)-Date.now()/1000)<=2
+      (Number(game.closes_at||0)-Date.now()/1000)<=0
     );
 
     b.onclick=()=>{
@@ -1344,6 +1345,7 @@ function renderLiveGame(d){
   const drawn=(d.drawn||[]).map(Number);
   const last=drawn.length?drawn[drawn.length-1]:null;
   document.getElementById('livePrize').textContent=Number(d.prize_pool_etb||0).toFixed(0)+' ETB';
+  document.getElementById('liveSold').textContent=(d.claimed||[]).length;
   document.getElementById('liveBalls').textContent=drawn.length+'/75';
   document.getElementById('livePlayers').textContent=Number(d.player_count||0);
   const liveCurrent=document.getElementById('liveCurrent');
