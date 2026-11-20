@@ -73,6 +73,11 @@ app.use((error, _req, res, _next) => {
 let worker;
 async function start() {
   await initDb();
+  const telegramBot = await bot.api.getMe();
+  console.log(`Telegram connected to @${telegramBot.username}`);
+  if (telegramBot.username !== "bravobingo1bot") {
+    console.warn(`WARNING: BOT_TOKEN belongs to @${telegramBot.username}, expected @bravobingo1bot`);
+  }
   await ensureRound();
   worker = setInterval(async () => {
     try {
